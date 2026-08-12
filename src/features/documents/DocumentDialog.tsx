@@ -91,7 +91,24 @@ function DocumentForm({
     () => accounts.filter((a) => !a.archived_at && a.code.startsWith('1000')),
     [accounts],
   )
-  const lineAccounts = useMemo(() => accounts.filter((a) => !a.archived_at), [accounts])
+  // Only the account types that make sense for this document's lines, and
+  // never the AR/AP control accounts — the engine posts those sides itself.
+  // A saved draft may still reference an account outside the filter (e.g.
+  // drafted before this rule); keep such accounts listed so the row stays
+  // legible instead of showing an empty select.
+  const referenced = useMemo(() => new Set(detail.lines.map((l) => l.account_id)), [detail.lines])
+  const lineAccounts = useMemo(
+    () =>
+      accounts.filter(
+        (a) =>
+          referenced.has(a.id) ||
+          (!a.archived_at &&
+            config.lineAccountTypes.includes(a.account_type) &&
+            a.code !== '1100' &&
+            a.code !== '2000'),
+      ),
+    [accounts, config.lineAccountTypes, referenced],
+  )
 
   // Open items of the chosen contact, for payments
   const { data: openItems } = useOpenItems(clientId, config.appliesTo ?? 'invoice', today)
@@ -239,7 +256,7 @@ function DocumentForm({
     >
       <div style={{ display: 'grid', gap: 14 }}>
         <FormError message={error} />
-        <div style={{ display: 'grid', gridTemplateColumns: config.hasDueDate ? '1fr 150px 150px' : '1fr 170px', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: config.hasDueDate ? 'minmax(0, 1fr) 140px 140px' : 'minmax(0, 1fr) 170px', gap: 12 }}>
           <Select
             label={config.contactSide === 'customer' ? 'Customer' : 'Vendor'}
             placeholder={`Choose a ${config.contactSide}`}
@@ -280,7 +297,7 @@ function DocumentForm({
               </p>
             ) : (
               appRows.map((a, i) => (
-                <div key={a.target_document_id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 140px', gap: 8, alignItems: 'center' }}>
+                <div key={a.target_document_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px 130px', gap: 8, alignItems: 'center' }}>
                   <span style={{ font: '400 13px/1.3 var(--font-mono)' }}>{a.label}</span>
                   <span style={{ textAlign: 'right' }}>
                     <Amount value={a.open} muted />
@@ -307,7 +324,7 @@ function DocumentForm({
               {config.lineHint || 'Lines'}
             </span>
             {lines.map((line, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px 34px', gap: 8, alignItems: 'center' }}>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px', gap: 8, alignItems: 'center' }}>
                 <Select
                   aria-label={`Line ${i + 1} account`}
                   placeholder="Account"

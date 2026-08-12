@@ -499,6 +499,45 @@ export interface Database {
           total_credit: string
         }[]
       }
+      profit_and_loss: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          account_type: string
+          code: string
+          name: string
+          amount: string
+        }[]
+      }
+      balance_sheet: {
+        Args: { p_client_id: string; p_as_of: string }
+        Returns: {
+          account_type: string
+          code: string
+          name: string
+          balance: string
+        }[]
+      }
+      cash_flow_indirect: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          section: string
+          label: string
+          amount: string
+        }[]
+      }
+      general_ledger: {
+        Args: { p_client_id: string; p_account_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          entry_id: string | null
+          entry_no: number | null
+          entry_date: string
+          memo: string
+          source_type: string
+          debit: string
+          credit: string
+          running: string
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -521,3 +560,7 @@ export type DocumentLine = Database['public']['Tables']['document_lines']['Row']
 export type DocumentApplication = Database['public']['Tables']['document_applications']['Row']
 export type OpenItemRow = Database['public']['Functions']['open_items']['Returns'][number]
 export type AgingRow = Database['public']['Functions']['aging']['Returns'][number]
+export type PnlRow = Database['public']['Functions']['profit_and_loss']['Returns'][number]
+export type BalanceSheetRow = Database['public']['Functions']['balance_sheet']['Returns'][number]
+export type CashFlowRow = Database['public']['Functions']['cash_flow_indirect']['Returns'][number]
+export type GeneralLedgerRow = Database['public']['Functions']['general_ledger']['Returns'][number]

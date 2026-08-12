@@ -18,7 +18,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned (matches the local CLI): resolving "latest" needs an
+          # anonymous GitHub API call that intermittently hits rate limits.
+          version: 2.113.0
       - name: Start local database
         run: supabase db start
       - name: Apply all migrations to a fresh database

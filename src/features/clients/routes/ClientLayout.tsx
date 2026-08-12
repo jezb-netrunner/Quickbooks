@@ -48,10 +48,16 @@ export function ClientLayout() {
     { to: `/c/${client.id}/money-in`, label: 'Money in', icon: 'arrow-left-right' },
     { to: `/c/${client.id}/money-out`, label: 'Money out', icon: 'wallet' },
     { to: `/c/${client.id}/journal`, label: 'Journal', icon: 'book-open' },
+    { heading: 'Reports' },
+    { to: `/c/${client.id}/trial-balance`, label: 'Trial balance', icon: 'scale' },
+    { to: `/c/${client.id}/profit-and-loss`, label: 'Profit & loss', icon: 'trending-up' },
+    { to: `/c/${client.id}/balance-sheet`, label: 'Balance sheet', icon: 'columns-2' },
+    { to: `/c/${client.id}/cash-flow`, label: 'Cash flow', icon: 'waves' },
+    { to: `/c/${client.id}/general-ledger`, label: 'General ledger', icon: 'library' },
+    { to: `/c/${client.id}/aging`, label: 'AR/AP aging', icon: 'pie-chart' },
+    { heading: 'Setup' },
     { to: `/c/${client.id}/coa`, label: 'Chart of accounts', icon: 'list-tree' },
     { to: `/c/${client.id}/periods`, label: 'Periods', icon: 'calendar' },
-    { to: `/c/${client.id}/trial-balance`, label: 'Trial balance', icon: 'scale' },
-    { to: `/c/${client.id}/aging`, label: 'AR/AP aging', icon: 'pie-chart' },
     { to: `/c/${client.id}/settings`, label: 'Client settings', icon: 'settings' },
   ]
 
