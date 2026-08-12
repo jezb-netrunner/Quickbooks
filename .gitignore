@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env.local
+.env*.local
+*.local
+
+# Supabase local stack state
+supabase/.temp/
+supabase/.branches/
+
+.DS_Store
+*.tsbuildinfo

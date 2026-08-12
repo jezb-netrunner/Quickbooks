@@ -1,0 +1,45 @@
+import { createBrowserRouter } from 'react-router-dom'
+import { RequireAuth } from './auth/RequireAuth'
+import { LoginPage } from './auth/routes/LoginPage'
+import { SignupPage } from './auth/routes/SignupPage'
+import { ResetRequestPage } from './auth/routes/ResetRequestPage'
+import { UpdatePasswordPage } from './auth/routes/UpdatePasswordPage'
+import { AuthCallbackPage } from './auth/routes/AuthCallbackPage'
+import { HomeRedirect } from './features/clients/routes/HomeRedirect'
+import { SelectClientPage } from './features/clients/routes/SelectClientPage'
+import { CreateFirmPage } from './features/clients/routes/CreateFirmPage'
+import { ClientLayout } from './features/clients/routes/ClientLayout'
+import { ClientOverviewPage } from './features/clients/routes/ClientOverviewPage'
+import { ClientSettingsPage } from './features/clients/routes/ClientSettingsPage'
+import { FirmPage } from './features/firm/FirmPage'
+
+// The active client is always the /c/:clientId URL segment — never only local
+// state. Phase 2+ screens (coa, journal, periods, …) slot in as siblings of
+// the client routes below.
+export const router = createBrowserRouter(
+  [
+    { path: '/login', element: <LoginPage /> },
+    { path: '/signup', element: <SignupPage /> },
+    { path: '/reset-password', element: <ResetRequestPage /> },
+    { path: '/update-password', element: <UpdatePasswordPage /> },
+    { path: '/auth/callback', element: <AuthCallbackPage /> },
+    {
+      element: <RequireAuth />,
+      children: [
+        { path: '/', element: <HomeRedirect /> },
+        { path: '/select-client', element: <SelectClientPage /> },
+        { path: '/create-firm', element: <CreateFirmPage /> },
+        { path: '/firm', element: <FirmPage /> },
+        {
+          path: '/c/:clientId',
+          element: <ClientLayout />,
+          children: [
+            { index: true, element: <ClientOverviewPage /> },
+            { path: 'settings', element: <ClientSettingsPage /> },
+          ],
+        },
+      ],
+    },
+  ],
+  { basename: import.meta.env.BASE_URL },
+)

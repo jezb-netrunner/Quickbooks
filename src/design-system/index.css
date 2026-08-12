@@ -1,0 +1,13 @@
+/* Fiscana design system entry point.
+   Token files are ported VERBATIM from the design handoff (source of truth).
+   fonts.css from the handoff (Google Fonts CDN @import) is intentionally
+   replaced by self-hosted @fontsource packages imported in main.tsx — the app
+   must load in a PH office with flaky internet, so no CDN font dependency. */
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/radius-elevation.css';
+@import './tokens/motion.css';
+@import './tokens/base.css';
+@import 'tailwindcss';
+@import './theme.css';
