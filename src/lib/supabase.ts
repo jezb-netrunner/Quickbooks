@@ -1,6 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './database.types'
-import { env } from './env'
+import { readEnv } from './env'
+
+// This module is only ever imported after main.tsx has verified readEnv().ok,
+// so the throw below is a backstop, not a user-facing path.
+const result = readEnv()
+if (!result.ok) {
+  throw new Error(`Supabase configuration missing: ${result.missing.join(', ')}`)
+}
+const env = result.env
 
 // The one client instance. PKCE + detectSessionInUrl handle the email
 // confirmation / password recovery links landing under the GitHub Pages
