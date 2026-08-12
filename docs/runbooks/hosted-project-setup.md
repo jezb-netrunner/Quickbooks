@@ -19,7 +19,10 @@ dashboard visit; drift here is invisible to CI.
    Variables** (variables, not secrets — these are public by design):
    - `VITE_SUPABASE_URL` = the project URL
    - `VITE_SUPABASE_ANON_KEY` = the anon key
-5. **GitHub repository → Settings → Pages**: Source = GitHub Actions.
+5. GitHub Pages is enabled automatically by the deploy workflow's first run
+   (`configure-pages` with `enablement: true`). If a deploy ever fails with
+   "Get Pages site failed", set Settings → Pages → Source = GitHub Actions
+   manually as the fallback.
 6. Deploy the schema: `supabase link --project-ref <ref>` then
    `supabase db push` from `main`. Never run SQL in the dashboard editor
    without committing the same SQL as a migration.
