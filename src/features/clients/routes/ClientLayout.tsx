@@ -42,6 +42,10 @@ export function ClientLayout() {
 
   const nav = [
     { to: `/c/${client.id}`, label: 'Overview', icon: 'layout-dashboard', end: true },
+    { to: `/c/${client.id}/coa`, label: 'Chart of accounts', icon: 'list-tree' },
+    { to: `/c/${client.id}/journal`, label: 'Journal', icon: 'book-open' },
+    { to: `/c/${client.id}/periods`, label: 'Periods', icon: 'calendar' },
+    { to: `/c/${client.id}/trial-balance`, label: 'Trial balance', icon: 'scale' },
     { to: `/c/${client.id}/settings`, label: 'Client settings', icon: 'settings' },
   ]
 

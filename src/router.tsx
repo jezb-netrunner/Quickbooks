@@ -12,6 +12,10 @@ import { ClientLayout } from './features/clients/routes/ClientLayout'
 import { ClientOverviewPage } from './features/clients/routes/ClientOverviewPage'
 import { ClientSettingsPage } from './features/clients/routes/ClientSettingsPage'
 import { FirmPage } from './features/firm/FirmPage'
+import { CoaPage } from './features/coa/routes/CoaPage'
+import { JournalPage } from './features/journal/routes/JournalPage'
+import { PeriodsPage } from './features/periods/routes/PeriodsPage'
+import { TrialBalancePage } from './features/reports/routes/TrialBalancePage'
 
 // The active client is always the /c/:clientId URL segment — never only local
 // state. Phase 2+ screens (coa, journal, periods, …) slot in as siblings of
@@ -35,6 +39,10 @@ export const router = createBrowserRouter(
           element: <ClientLayout />,
           children: [
             { index: true, element: <ClientOverviewPage /> },
+            { path: 'coa', element: <CoaPage /> },
+            { path: 'journal', element: <JournalPage /> },
+            { path: 'periods', element: <PeriodsPage /> },
+            { path: 'trial-balance', element: <TrialBalancePage /> },
             { path: 'settings', element: <ClientSettingsPage /> },
           ],
         },

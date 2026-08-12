@@ -14,7 +14,8 @@ The browser is untrusted.
 
 - [x] **Phase 1** — scaffold, Pages deploy, auth, firm/client/membership
       schema + RLS with isolation tests, firm admin console, client switcher
-- [ ] Phase 2 — chart of accounts, periods, journal engine + trial balance
+- [x] **Phase 2** — chart of accounts (PH SME template), monthly periods with
+      close/lock, immutable double-entry journal engine, reversals, trial balance
 - [ ] Phase 3 — documents posting through the engine; AR/AP subledgers
 - [ ] Phase 4 — financial statements, GL drill-down
 - [ ] Phase 5 — tax profile, VAT/EWT automation, BIR books

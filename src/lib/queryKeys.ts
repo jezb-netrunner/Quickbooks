@@ -7,4 +7,10 @@ export const keys = {
   client: (clientId: string) => ['client', clientId] as const,
   members: (firmId: string) => ['members', firmId] as const,
   assignments: (firmId: string) => ['assignments', firmId] as const,
+  accounts: (clientId: string) => ['accounts', clientId] as const,
+  periods: (clientId: string) => ['periods', clientId] as const,
+  entries: (clientId: string) => ['entries', clientId] as const,
+  entryLines: (clientId: string, entryId: string) => ['entry-lines', clientId, entryId] as const,
+  trialBalance: (clientId: string, from: string, to: string) =>
+    ['trial-balance', clientId, from, to] as const,
 }
