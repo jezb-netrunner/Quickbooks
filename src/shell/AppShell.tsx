@@ -1,10 +1,20 @@
 import type { ReactNode } from 'react'
 
 // Fixed 232px ink sidebar; the page body is the only scroller — per the
-// Fiscana portal shell.
+// Fiscana portal shell. The design system defines no mobile breakpoints
+// (desktop-only by decision), so minWidth keeps small screens panning a real
+// desktop layout instead of crushing the content column.
 export function AppShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--surface-page)', overflow: 'hidden' }}>
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        minWidth: 960,
+        background: 'var(--surface-page)',
+        overflow: 'hidden',
+      }}
+    >
       {sidebar}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
         {children}
