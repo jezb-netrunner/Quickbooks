@@ -12,6 +12,9 @@ export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense
 export type NormalBalance = 'debit' | 'credit'
 export type PeriodStatus = 'open' | 'closed' | 'locked'
 export type EntryStatus = 'draft' | 'posted'
+export type ContactType = 'customer' | 'vendor' | 'both'
+export type DocType = 'invoice' | 'bill' | 'receipt' | 'disbursement'
+export type DocStatus = 'draft' | 'issued' | 'voided'
 
 export interface Database {
   public: {
@@ -241,6 +244,122 @@ export interface Database {
         Update: { entry_date?: string; memo?: string }
         Relationships: []
       }
+      contacts: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          contact_type: ContactType
+          tin: string | null
+          email: string | null
+          archived_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          name: string
+          contact_type: ContactType
+          tin?: string | null
+          email?: string | null
+        }
+        Update: {
+          name?: string
+          contact_type?: ContactType
+          tin?: string | null
+          email?: string | null
+          archived_at?: string | null
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          id: string
+          client_id: string
+          doc_type: DocType
+          doc_no: number | null
+          doc_date: string
+          due_date: string | null
+          contact_id: string
+          bank_account_id: string | null
+          memo: string
+          status: DocStatus
+          entry_id: string | null
+          voided_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          doc_type: DocType
+          doc_date: string
+          due_date?: string | null
+          contact_id: string
+          bank_account_id?: string | null
+          memo?: string
+        }
+        Update: {
+          doc_date?: string
+          due_date?: string | null
+          contact_id?: string
+          bank_account_id?: string | null
+          memo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'documents_contact_id_client_id_fkey'
+            columns: ['contact_id', 'client_id']
+            isOneToOne: false
+            referencedRelation: 'contacts'
+            referencedColumns: ['id', 'client_id']
+          },
+        ]
+      }
+      document_lines: {
+        Row: {
+          id: string
+          document_id: string
+          client_id: string
+          line_no: number
+          account_id: string
+          description: string
+          amount: string
+        }
+        Insert: {
+          document_id: string
+          client_id: string
+          line_no: number
+          account_id: string
+          description?: string
+          amount: number | string
+        }
+        Update: {
+          line_no?: number
+          account_id?: string
+          description?: string
+          amount?: number | string
+        }
+        Relationships: []
+      }
+      document_applications: {
+        Row: {
+          id: string
+          client_id: string
+          paying_document_id: string
+          target_document_id: string
+          amount: string
+        }
+        Insert: {
+          client_id: string
+          paying_document_id: string
+          target_document_id: string
+          amount: number | string
+        }
+        Update: { amount?: number | string }
+        Relationships: []
+      }
       journal_lines: {
         Row: {
           id: string
@@ -328,6 +447,46 @@ export interface Database {
         Args: { p_entry_id: string; p_date?: string | null; p_memo?: string | null }
         Returns: string
       }
+      issue_document: {
+        Args: { p_document_id: string }
+        Returns: number
+      }
+      void_document: {
+        Args: { p_document_id: string; p_date?: string | null }
+        Returns: undefined
+      }
+      open_items: {
+        Args: { p_client_id: string; p_doc_type: string; p_as_of: string }
+        Returns: {
+          document_id: string
+          doc_no: number
+          doc_date: string
+          due_date: string | null
+          contact_id: string
+          contact_name: string
+          total: string
+          applied: string
+          balance: string
+          days_overdue: number
+        }[]
+      }
+      aging: {
+        Args: { p_client_id: string; p_doc_type: string; p_as_of: string }
+        Returns: {
+          contact_id: string
+          contact_name: string
+          current_amount: string
+          days_1_30: string
+          days_31_60: string
+          days_61_90: string
+          days_over_90: string
+          total: string
+        }[]
+      }
+      client_dashboard: {
+        Args: { p_client_id: string }
+        Returns: Json
+      }
       trial_balance: {
         Args: { p_client_id: string; p_date_from: string; p_date_to: string }
         Returns: {
@@ -356,3 +515,9 @@ export type Period = Database['public']['Tables']['periods']['Row']
 export type JournalEntry = Database['public']['Tables']['journal_entries']['Row']
 export type JournalLine = Database['public']['Tables']['journal_lines']['Row']
 export type TrialBalanceRow = Database['public']['Functions']['trial_balance']['Returns'][number]
+export type Contact = Database['public']['Tables']['contacts']['Row']
+export type DocumentRow = Database['public']['Tables']['documents']['Row']
+export type DocumentLine = Database['public']['Tables']['document_lines']['Row']
+export type DocumentApplication = Database['public']['Tables']['document_applications']['Row']
+export type OpenItemRow = Database['public']['Functions']['open_items']['Returns'][number]
+export type AgingRow = Database['public']['Functions']['aging']['Returns'][number]

@@ -13,4 +13,13 @@ export const keys = {
   entryLines: (clientId: string, entryId: string) => ['entry-lines', clientId, entryId] as const,
   trialBalance: (clientId: string, from: string, to: string) =>
     ['trial-balance', clientId, from, to] as const,
+  contacts: (clientId: string) => ['contacts', clientId] as const,
+  documents: (clientId: string, docType: string) => ['documents', clientId, docType] as const,
+  documentDetail: (clientId: string, documentId: string) =>
+    ['document-detail', clientId, documentId] as const,
+  openItems: (clientId: string, docType: string, asOf: string) =>
+    ['open-items', clientId, docType, asOf] as const,
+  aging: (clientId: string, docType: string, asOf: string) =>
+    ['aging', clientId, docType, asOf] as const,
+  dashboard: (clientId: string) => ['dashboard', clientId] as const,
 }

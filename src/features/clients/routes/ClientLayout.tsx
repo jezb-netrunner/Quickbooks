@@ -41,11 +41,17 @@ export function ClientLayout() {
   }
 
   const nav = [
-    { to: `/c/${client.id}`, label: 'Overview', icon: 'layout-dashboard', end: true },
-    { to: `/c/${client.id}/coa`, label: 'Chart of accounts', icon: 'list-tree' },
+    { to: `/c/${client.id}`, label: 'Dashboard', icon: 'layout-dashboard', end: true },
+    { to: `/c/${client.id}/contacts`, label: 'Customers & vendors', icon: 'users' },
+    { to: `/c/${client.id}/invoices`, label: 'Invoices', icon: 'receipt' },
+    { to: `/c/${client.id}/bills`, label: 'Bills', icon: 'credit-card' },
+    { to: `/c/${client.id}/money-in`, label: 'Money in', icon: 'arrow-left-right' },
+    { to: `/c/${client.id}/money-out`, label: 'Money out', icon: 'wallet' },
     { to: `/c/${client.id}/journal`, label: 'Journal', icon: 'book-open' },
+    { to: `/c/${client.id}/coa`, label: 'Chart of accounts', icon: 'list-tree' },
     { to: `/c/${client.id}/periods`, label: 'Periods', icon: 'calendar' },
     { to: `/c/${client.id}/trial-balance`, label: 'Trial balance', icon: 'scale' },
+    { to: `/c/${client.id}/aging`, label: 'AR/AP aging', icon: 'pie-chart' },
     { to: `/c/${client.id}/settings`, label: 'Client settings', icon: 'settings' },
   ]
 
