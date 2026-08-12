@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Amount, Button, Card, DataTable, Input, type Column } from '@/design-system'
+import { Amount, Card, DataTable, ExportMenu, Input, type Column } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
 import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
-import { downloadCsv } from '@/lib/csv'
 import type { TrialBalanceRow } from '@/lib/database.types'
+import type { ReportExport } from '@/lib/exports'
 
 async function fetchTrialBalance(clientId: string, from: string, to: string): Promise<TrialBalanceRow[]> {
   const { data, error } = await supabase.rpc('trial_balance', {
@@ -61,21 +61,17 @@ export function TrialBalancePage() {
         title="Trial balance"
         subtitle="Posted entries only, drillable by the journal"
         actions={
-          <Button
-            size="sm"
-            variant="secondary"
-            iconLeft="download"
+          <ExportMenu
             disabled={withActivity.length === 0}
-            onClick={() =>
-              downloadCsv(
-                `trial-balance_${client.code ?? client.name}_${from}_${to}.csv`,
-                ['Code', 'Account', 'Type', 'Debit', 'Credit'],
-                withActivity.map((r) => [r.code, r.name, r.account_type, r.total_debit, r.total_credit]),
-              )
-            }
-          >
-            Export CSV
-          </Button>
+            report={(): ReportExport => ({
+              filename: `trial-balance_${client.code ?? client.name}_${from}_${to}`,
+              title: 'Trial balance',
+              subtitle: [client.name, `${from} to ${to}`],
+              header: ['Code', 'Account', 'Type', 'Debit', 'Credit'],
+              rows: withActivity.map((r) => [r.code, r.name, r.account_type, r.total_debit, r.total_credit]),
+              numericColumns: [3, 4],
+            })}
+          />
         }
       />
       <PageBody>

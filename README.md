@@ -16,7 +16,9 @@ The browser is untrusted.
       schema + RLS with isolation tests, firm admin console, client switcher
 - [x] **Phase 2** — chart of accounts (PH SME template), monthly periods with
       close/lock, immutable double-entry journal engine, reversals, trial balance
-- [ ] Phase 3 — documents posting through the engine; AR/AP subledgers
+- [x] **Phase 3** — customers/vendors, invoices, bills, receipts and
+      disbursements posting through the engine, open-item AR/AP with aging,
+      live client dashboard, PDF/Excel/CSV report exports
 - [ ] Phase 4 — financial statements, GL drill-down
 - [ ] Phase 5 — tax profile, VAT/EWT automation, BIR books
 - [ ] Phase 6 — return working papers, compliance calendar, 2307s

@@ -16,6 +16,9 @@ import { CoaPage } from './features/coa/routes/CoaPage'
 import { JournalPage } from './features/journal/routes/JournalPage'
 import { PeriodsPage } from './features/periods/routes/PeriodsPage'
 import { TrialBalancePage } from './features/reports/routes/TrialBalancePage'
+import { AgingPage } from './features/reports/routes/AgingPage'
+import { ContactsPage } from './features/contacts/routes/ContactsPage'
+import { DocumentsPage } from './features/documents/DocumentsPage'
 
 // The active client is always the /c/:clientId URL segment — never only local
 // state. Phase 2+ screens (coa, journal, periods, …) slot in as siblings of
@@ -39,10 +42,16 @@ export const router = createBrowserRouter(
           element: <ClientLayout />,
           children: [
             { index: true, element: <ClientOverviewPage /> },
+            { path: 'contacts', element: <ContactsPage /> },
+            { path: 'invoices', element: <DocumentsPage docType="invoice" /> },
+            { path: 'bills', element: <DocumentsPage docType="bill" /> },
+            { path: 'money-in', element: <DocumentsPage docType="receipt" /> },
+            { path: 'money-out', element: <DocumentsPage docType="disbursement" /> },
             { path: 'coa', element: <CoaPage /> },
             { path: 'journal', element: <JournalPage /> },
             { path: 'periods', element: <PeriodsPage /> },
             { path: 'trial-balance', element: <TrialBalancePage /> },
+            { path: 'aging', element: <AgingPage /> },
             { path: 'settings', element: <ClientSettingsPage /> },
           ],
         },
