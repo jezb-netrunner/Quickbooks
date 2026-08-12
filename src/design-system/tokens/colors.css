@@ -1,0 +1,20 @@
+:root{
+/* --- Ink blue: the trust anchor. 30% of any composition. --- */
+--ink-950:#0E1626;--ink-900:#14203A;--ink-800:#1B2A4A;--ink-700:#27395F;--ink-600:#3A4E78;--ink-500:#566A94;--ink-400:#8195B9;--ink-300:#B3C0D6;--ink-100:#E3E8F1;
+/* --- Warm neutral base: 60% of any composition. --- */
+--sand-50:#FCFBF9;--sand-100:#F7F5F1;--sand-200:#EFEBE4;--sand-300:#E2DDD4;--sand-400:#C9C3B9;--sand-500:#A8A29A;--sand-600:#8B8680;--sand-700:#6B6862;--sand-800:#4A4844;--sand-900:#2E2C29;
+/* --- Amber accent: 10% maximum. Actions, focus, the one thing that matters. --- */
+--amber-700:#A96712;--amber-600:#C9821F;--amber-500:#E8A33D;--amber-400:#F0BC6E;--amber-300:#F6D3A0;--amber-200:#FAE6C7;--amber-100:#FCF3E3;
+/* --- Teal: reserved for money moving the right way. Never a brand accent. --- */
+--teal-700:#0F6B4C;--teal-600:#178F66;--teal-500:#1FAE7D;--teal-200:#BCE7D6;--teal-100:#E4F5EE;
+/* --- Clay: overdue, failed, negative balance. --- */
+--clay-700:#8E2F26;--clay-600:#B23A30;--clay-500:#C9544A;--clay-200:#F2CFCB;--clay-100:#FAEAE8;
+
+/* --- Semantic aliases: prefer these in components. --- */
+--text-primary:var(--ink-800);--text-secondary:var(--sand-700);--text-muted:var(--sand-600);--text-inverse:var(--sand-100);--text-accent:var(--amber-700);--text-link:var(--ink-700);--text-link-hover:var(--amber-700);
+--surface-page:var(--sand-100);--surface-card:#FFFFFF;--surface-sunken:var(--sand-200);--surface-raised:var(--sand-50);--surface-ink:var(--ink-800);--surface-ink-deep:var(--ink-950);--surface-accent-soft:var(--amber-100);--surface-positive-soft:var(--teal-100);--surface-negative-soft:var(--clay-100);
+--border-subtle:var(--sand-200);--border-default:var(--sand-300);--border-strong:var(--sand-400);--border-ink:var(--ink-800);--border-focus:var(--amber-500);
+--accent:var(--amber-500);--accent-hover:var(--amber-600);--accent-press:var(--amber-700);--accent-contrast:var(--ink-900);
+--positive:var(--teal-600);--negative:var(--clay-600);--warning:var(--amber-600);--info:var(--ink-600);
+--focus-ring:0 0 0 3px rgba(232,163,61,.45);
+}

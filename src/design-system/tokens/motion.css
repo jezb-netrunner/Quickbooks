@@ -1,0 +1,11 @@
+:root{
+--dur-instant:80ms; /* @kind other */
+--dur-fast:130ms; /* @kind other */
+--dur-base:190ms; /* @kind other */
+--dur-slow:280ms; /* @kind other */
+--dur-deliberate:420ms; /* @kind other */
+--ease-standard:cubic-bezier(.2,.7,.3,1); /* @kind other */
+--ease-in:cubic-bezier(.5,0,.9,.3); /* @kind other */
+--ease-out:cubic-bezier(.1,.8,.3,1); /* @kind other */
+/* No bounce, no overshoot, no spring. Ledger software does not spring. */
+}

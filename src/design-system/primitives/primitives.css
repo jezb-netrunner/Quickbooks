@@ -1,0 +1,263 @@
+/* Fiscana primitive styling. Rules from the design-system guide:
+   hover = one step lighter (ink) / darker (amber); press = one step further,
+   color only — nothing moves under the finger; focus = amber ring;
+   motion = fades and ≤6px translation, 80/130/190/280ms. */
+
+/* ---------------------------------------------------------------- Button */
+.fis-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: var(--weight-medium) var(--text-sm) / 1 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.fis-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.fis-btn--md { height: var(--control-h-md); padding: 0 14px; }
+.fis-btn--sm { height: var(--control-h-sm); padding: 0 10px; font-size: var(--text-xs); }
+.fis-btn--full { width: 100%; }
+
+.fis-btn--primary { background: var(--ink-800); color: var(--sand-100); box-shadow: var(--shadow-xs); }
+.fis-btn--primary:hover:not(:disabled) { background: var(--ink-700); }
+.fis-btn--primary:active:not(:disabled) { background: var(--ink-600); }
+
+.fis-btn--accent { background: var(--amber-500); color: var(--ink-900); box-shadow: var(--shadow-xs); }
+.fis-btn--accent:hover:not(:disabled) { background: var(--amber-600); }
+.fis-btn--accent:active:not(:disabled) { background: var(--amber-700); color: var(--sand-100); }
+
+.fis-btn--secondary { background: var(--surface-card); color: var(--text-primary); border-color: var(--border-default); box-shadow: var(--shadow-xs); }
+.fis-btn--secondary:hover:not(:disabled) { background: var(--sand-200); }
+.fis-btn--secondary:active:not(:disabled) { background: var(--sand-300); }
+
+.fis-btn--ghost { background: transparent; color: var(--text-secondary); }
+.fis-btn--ghost:hover:not(:disabled) { background: var(--sand-200); color: var(--text-primary); }
+.fis-btn--ghost:active:not(:disabled) { background: var(--sand-300); }
+
+.fis-btn--danger { background: var(--surface-card); color: var(--clay-600); border-color: var(--border-default); box-shadow: var(--shadow-xs); }
+.fis-btn--danger:hover:not(:disabled) { background: var(--clay-100); border-color: var(--clay-200); }
+.fis-btn--danger:active:not(:disabled) { background: var(--clay-200); }
+
+/* ------------------------------------------------------------ IconButton */
+.fis-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.fis-iconbtn:hover { background: var(--sand-200); color: var(--text-primary); }
+.fis-iconbtn--outline { border-color: var(--border-default); background: var(--surface-card); box-shadow: var(--shadow-xs); }
+
+/* ---------------------------------------------------------------- Badge */
+.fis-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font: var(--weight-medium) var(--text-2xs) / 1.2 var(--font-sans);
+}
+.fis-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.fis-badge--positive { background: var(--teal-100); color: var(--teal-700); }
+.fis-badge--warning { background: var(--amber-100); color: var(--amber-700); }
+.fis-badge--negative { background: var(--clay-100); color: var(--clay-700); }
+.fis-badge--ink { background: var(--ink-100); color: var(--ink-700); }
+.fis-badge--neutral { background: var(--sand-200); color: var(--sand-700); }
+
+.fis-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--sand-200);
+  color: var(--sand-800);
+  font: var(--weight-medium) var(--text-2xs) / 1.2 var(--font-sans);
+}
+
+/* ----------------------------------------------------------------- Card */
+.fis-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.fis-card--sunken { background: var(--surface-sunken); box-shadow: none; }
+.fis-card--ink { background: var(--surface-ink); border-color: var(--ink-700); color: var(--sand-100); }
+.fis-card--ink h3 { color: var(--sand-100); }
+.fis-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fis-card--ink .fis-card__header { border-bottom-color: var(--ink-700); }
+.fis-card__title { font: 600 var(--text-md) / var(--leading-snug) var(--font-display); letter-spacing: var(--tracking-snug); }
+.fis-card__subtitle { margin-top: 2px; font: var(--type-label); color: var(--text-muted); }
+.fis-card__body { padding: 20px; }
+.fis-card__body--none { padding: 0; }
+
+/* -------------------------------------------------------- Input / Select */
+.fis-field { display: flex; flex-direction: column; gap: 6px; }
+.fis-field__label { font: var(--type-label); color: var(--text-secondary); }
+.fis-field__hint { font: var(--type-label); color: var(--text-muted); }
+.fis-field__error { font: var(--type-label); color: var(--clay-600); }
+.fis-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--control-h-md);
+  padding: 0 11px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-inset);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.fis-control--sm { height: var(--control-h-sm); }
+.fis-control:focus-within { border-color: var(--border-focus); box-shadow: var(--focus-ring); }
+.fis-control--error { border-color: var(--clay-500); }
+.fis-control input, .fis-control select {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font: 400 var(--text-sm) / 1.3 var(--font-sans);
+  color: var(--text-primary);
+  height: 100%;
+}
+.fis-control input::placeholder { color: var(--text-muted); }
+
+/* ------------------------------------------------------------- Checkbox */
+.fis-check { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.fis-check input { accent-color: var(--ink-800); width: 15px; height: 15px; margin-top: 2px; flex: none; }
+.fis-check__label { font: 400 var(--text-sm) / 1.4 var(--font-sans); color: var(--text-primary); }
+.fis-check__desc { font: var(--type-label); color: var(--text-muted); margin-top: 1px; }
+
+/* ----------------------------------------------------------------- Tabs */
+.fis-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-subtle); }
+.fis-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: var(--weight-medium) var(--text-sm) / 1 var(--font-sans);
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.fis-tabs__tab:hover { color: var(--text-primary); }
+.fis-tabs__tab--on { color: var(--text-primary); border-bottom-color: var(--ink-800); }
+.fis-tabs__count {
+  font: 500 11px / 1 var(--font-mono);
+  background: var(--sand-200);
+  color: var(--sand-700);
+  padding: 3px 6px;
+  border-radius: var(--radius-pill);
+}
+.fis-tabs--pill { border-bottom: none; background: var(--sand-200); border-radius: var(--radius-pill); padding: 2px; gap: 0; }
+.fis-tabs--pill .fis-tabs__tab { border-bottom: none; margin-bottom: 0; padding: 6px 12px; border-radius: var(--radius-pill); font-size: var(--text-xs); }
+.fis-tabs--pill .fis-tabs__tab--on { background: var(--surface-card); box-shadow: var(--shadow-xs); }
+
+/* --------------------------------------------------------------- Dialog */
+.fis-dialog__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 22, 38, 0.42);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 60;
+  animation: fis-fade var(--dur-base) var(--ease-standard);
+}
+.fis-dialog {
+  background: var(--surface-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  animation: fis-rise var(--dur-base) var(--ease-standard);
+}
+.fis-dialog__head { padding: 20px 24px 0; }
+.fis-dialog__title { font: 600 var(--text-lg) / var(--leading-snug) var(--font-display); letter-spacing: var(--tracking-snug); }
+.fis-dialog__desc { margin-top: 4px; font: var(--type-body-sm); color: var(--text-secondary); }
+.fis-dialog__body { padding: 18px 24px; overflow-y: auto; }
+.fis-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ---------------------------------------------------------------- Toast */
+.fis-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 80;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  width: 340px;
+  padding: 14px 16px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: fis-rise var(--dur-base) var(--ease-standard);
+}
+.fis-toast__title { font: var(--weight-medium) var(--text-sm) / 1.35 var(--font-sans); }
+.fis-toast__msg { margin-top: 2px; font: var(--type-label); color: var(--text-secondary); }
+
+/* ------------------------------------------------------------- DataTable */
+.fis-table-wrap { overflow-x: auto; }
+.fis-table { width: 100%; border-collapse: collapse; }
+.fis-table th {
+  text-align: left;
+  padding: 10px 20px;
+  font: 600 var(--text-3xs) / 1.2 var(--font-sans);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.fis-table td {
+  padding: 13px 20px;
+  font: 400 var(--text-sm) / 1.35 var(--font-sans);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fis-table--dense td { padding: 10px 20px; }
+.fis-table tbody tr:last-child td { border-bottom: none; }
+.fis-table tbody tr.fis-table__row--click { cursor: pointer; transition: background var(--dur-instant) var(--ease-standard); }
+.fis-table tbody tr.fis-table__row--click:hover { background: var(--sand-100); }
+.fis-table__empty { padding: 28px 20px; font: var(--type-body-sm); color: var(--text-muted); text-align: center; }
+
+@keyframes fis-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fis-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .fis-dialog__scrim, .fis-dialog, .fis-toast { animation: none; }
+}

@@ -1,0 +1,5 @@
+:root{
+--space-0:0;--space-1:2px;--space-2:4px;--space-3:6px;--space-4:8px;--space-5:12px;--space-6:16px;--space-7:20px;--space-8:24px;--space-9:32px;--space-10:40px;--space-11:48px;--space-12:64px;--space-13:80px;--space-14:96px;--space-15:128px;
+--gutter-page:32px;--gutter-page-lg:56px;--max-content:1200px;--max-prose:68ch;
+--control-h-sm:30px;--control-h-md:38px;--control-h-lg:46px;
+}

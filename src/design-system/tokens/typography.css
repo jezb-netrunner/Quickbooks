@@ -1,0 +1,22 @@
+:root{
+--font-display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+--font-sans:"Inter",ui-sans-serif,system-ui,sans-serif;
+--font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
+
+--text-3xs:11px;--text-2xs:12px;--text-xs:13px;--text-sm:14px;--text-base:16px;--text-md:18px;--text-lg:20px;--text-xl:24px;--text-2xl:30px;--text-3xl:38px;--text-4xl:48px;--text-5xl:60px;--text-6xl:76px;
+
+--leading-tight:1.05;--leading-snug:1.2;--leading-normal:1.45;--leading-relaxed:1.6;
+--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;
+--tracking-tight:-0.02em;--tracking-snug:-0.01em;--tracking-normal:0;--tracking-wide:0.04em;--tracking-caps:0.09em;
+
+/* Composed roles */
+--type-display:var(--weight-600,700) var(--text-5xl)/var(--leading-tight) var(--font-display);
+--type-h1:600 var(--text-3xl)/var(--leading-snug) var(--font-display);
+--type-h2:600 var(--text-xl)/var(--leading-snug) var(--font-display);
+--type-h3:600 var(--text-md)/var(--leading-snug) var(--font-display);
+--type-body:400 var(--text-base)/var(--leading-normal) var(--font-sans);
+--type-body-sm:400 var(--text-sm)/var(--leading-normal) var(--font-sans);
+--type-label:500 var(--text-xs)/1.3 var(--font-sans);
+--type-overline:600 var(--text-3xs)/1.2 var(--font-sans);
+--type-figure:500 var(--text-base)/1.3 var(--font-mono);
+}
