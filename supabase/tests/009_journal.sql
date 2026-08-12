@@ -3,7 +3,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(18);
 
 \ir 000_fixture.sql.inc
 
