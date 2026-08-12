@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { messageOf } from '@/lib/errors'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button, Input } from '@/design-system'
 import { AuthCard, FormError } from '../AuthCard'
@@ -21,7 +22,7 @@ export function LoginPage() {
       const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from
       navigate(from ? { pathname: from.pathname, search: from.search } : '/', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed.')
+      setError(messageOf(err, 'Sign in failed.'))
     } finally {
       setBusy(false)
     }

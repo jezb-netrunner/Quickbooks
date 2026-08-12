@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { messageOf } from '@/lib/errors'
 import { useNavigate } from 'react-router-dom'
 import { Button, Input } from '@/design-system'
 import { AuthCard, FormError } from '../AuthCard'
@@ -21,7 +22,7 @@ export function UpdatePasswordPage() {
       await updatePassword(password)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the password.')
+      setError(messageOf(err, 'Could not update the password.'))
     } finally {
       setBusy(false)
     }

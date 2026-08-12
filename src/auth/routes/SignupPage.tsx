@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { messageOf } from '@/lib/errors'
 import { Link } from 'react-router-dom'
 import { Button, Input } from '@/design-system'
 import { AuthCard, FormError } from '../AuthCard'
@@ -20,7 +21,7 @@ export function SignupPage() {
       await signUp(email, password, fullName.trim())
       setSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign up failed.')
+      setError(messageOf(err, 'Sign up failed.'))
     } finally {
       setBusy(false)
     }

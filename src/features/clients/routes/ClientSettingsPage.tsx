@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { messageOf } from '@/lib/errors'
 import { Button, Card, Dialog, Toast } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
 import { useActiveClient } from './ClientLayout'
@@ -29,7 +30,7 @@ export function ClientSettingsPage() {
                 setError(null)
                 updateClient.mutate(values, {
                   onSuccess: () => setSaved(true),
-                  onError: (err) => setError(err instanceof Error ? err.message : 'Save failed.'),
+                  onError: (err) => setError(messageOf(err, 'Save failed.')),
                 })
               }}
             />
@@ -52,7 +53,7 @@ export function ClientSettingsPage() {
                     disabled={setArchived.isPending}
                     onClick={() =>
                       setArchived.mutate(false, {
-                        onError: (err) => setError(err instanceof Error ? err.message : 'Restore failed.'),
+                        onError: (err) => setError(messageOf(err, 'Restore failed.')),
                       })
                     }
                   >
@@ -86,7 +87,7 @@ export function ClientSettingsPage() {
                     onSuccess: () => setConfirmArchive(false),
                     onError: (err) => {
                       setConfirmArchive(false)
-                      setError(err instanceof Error ? err.message : 'Archive failed.')
+                      setError(messageOf(err, 'Archive failed.'))
                     },
                   })
                 }
