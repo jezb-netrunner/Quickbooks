@@ -11,6 +11,8 @@ interface NavItem {
   end?: boolean
 }
 
+export type NavEntry = NavItem | { heading: string }
+
 const navLinkStyle = (on: boolean) =>
   ({
     display: 'flex',
@@ -26,7 +28,7 @@ const navLinkStyle = (on: boolean) =>
     transition: 'background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)',
   }) as const
 
-export function Sidebar({ items, activeClientId }: { items: NavItem[]; activeClientId?: string }) {
+export function Sidebar({ items, activeClientId }: { items: NavEntry[]; activeClientId?: string }) {
   const { session } = useAuth()
   const navigate = useNavigate()
   const meta = session?.user.user_metadata as { full_name?: string } | undefined
@@ -65,13 +67,28 @@ export function Sidebar({ items, activeClientId }: { items: NavItem[]; activeCli
         <span style={{ width: 7, height: 7, borderRadius: 2, background: 'var(--amber-500)' }} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {items.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.end} style={({ isActive }) => navLinkStyle(isActive)}>
-            <Icon name={item.icon} size={17} />
-            <span style={{ flex: 1 }}>{item.label}</span>
-          </NavLink>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', minHeight: 0 }}>
+        {items.map((item) =>
+          'heading' in item ? (
+            <span
+              key={`h:${item.heading}`}
+              style={{
+                padding: '12px 10px 4px',
+                font: 'var(--type-overline)',
+                letterSpacing: 'var(--tracking-caps)',
+                textTransform: 'uppercase',
+                color: 'var(--ink-400)',
+              }}
+            >
+              {item.heading}
+            </span>
+          ) : (
+            <NavLink key={item.to} to={item.to} end={item.end} style={({ isActive }) => navLinkStyle(isActive)}>
+              <Icon name={item.icon} size={17} />
+              <span style={{ flex: 1 }}>{item.label}</span>
+            </NavLink>
+          ),
+        )}
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>

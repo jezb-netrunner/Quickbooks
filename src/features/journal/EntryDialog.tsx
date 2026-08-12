@@ -189,7 +189,7 @@ function EntryForm({
     >
       <div style={{ display: 'grid', gap: 14 }}>
         <FormError message={error} />
-        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(0, 1fr)', gap: 12 }}>
           <Input
             label="Date"
             type="date"
@@ -210,7 +210,7 @@ function EntryForm({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 120px 120px 34px',
+              gridTemplateColumns: 'minmax(0, 1fr) 110px 110px 34px',
               gap: 8,
               font: 'var(--type-overline)',
               letterSpacing: 'var(--tracking-caps)',
@@ -225,7 +225,7 @@ function EntryForm({
             <span />
           </div>
           {lines.map((line, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 34px', gap: 8, alignItems: 'center' }}>
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px 110px 34px', gap: 8, alignItems: 'center' }}>
               {isPosted ? (
                 <span style={{ font: '400 13px/1.3 var(--font-sans)' }}>
                   {accountName.get(line.account_id) ?? '—'}

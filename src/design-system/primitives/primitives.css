@@ -111,7 +111,10 @@
 .fis-card__body--none { padding: 0; }
 
 /* -------------------------------------------------------- Input / Select */
-.fis-field { display: flex; flex-direction: column; gap: 6px; }
+/* min-width: 0 lets a field placed in a grid/flex track shrink below the
+   intrinsic width of its content (a select's longest option) instead of
+   forcing the row wider than the dialog. */
+.fis-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .fis-field__label { font: var(--type-label); color: var(--text-secondary); }
 .fis-field__hint { font: var(--type-label); color: var(--text-muted); }
 .fis-field__error { font: var(--type-label); color: var(--clay-600); }
@@ -206,7 +209,7 @@
 .fis-dialog__head { padding: 20px 24px 0; }
 .fis-dialog__title { font: 600 var(--text-lg) / var(--leading-snug) var(--font-display); letter-spacing: var(--tracking-snug); }
 .fis-dialog__desc { margin-top: 4px; font: var(--type-body-sm); color: var(--text-secondary); }
-.fis-dialog__body { padding: 18px 24px; overflow-y: auto; }
+.fis-dialog__body { padding: 18px 24px; overflow-y: auto; overflow-x: hidden; }
 .fis-dialog__foot {
   display: flex;
   justify-content: flex-end;

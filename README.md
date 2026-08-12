@@ -19,7 +19,9 @@ The browser is untrusted.
 - [x] **Phase 3** — customers/vendors, invoices, bills, receipts and
       disbursements posting through the engine, open-item AR/AP with aging,
       live client dashboard, PDF/Excel/CSV report exports
-- [ ] Phase 4 — financial statements, GL drill-down
+- [x] **Phase 4** — profit & loss, balance sheet, cash flow (indirect), general
+      ledger drill-down from the trial balance, control-account guard on
+      document lines
 - [ ] Phase 5 — tax profile, VAT/EWT automation, BIR books
 - [ ] Phase 6 — return working papers, compliance calendar, 2307s
 - [ ] Phase 7 — bank import, attachments, review workflow, practice dashboard

@@ -22,4 +22,10 @@ export const keys = {
   aging: (clientId: string, docType: string, asOf: string) =>
     ['aging', clientId, docType, asOf] as const,
   dashboard: (clientId: string) => ['dashboard', clientId] as const,
+  pnl: (clientId: string, from: string, to: string) => ['pnl', clientId, from, to] as const,
+  balanceSheet: (clientId: string, asOf: string) => ['balance-sheet', clientId, asOf] as const,
+  cashFlow: (clientId: string, from: string, to: string) =>
+    ['cash-flow', clientId, from, to] as const,
+  generalLedger: (clientId: string, accountId: string, from: string, to: string) =>
+    ['general-ledger', clientId, accountId, from, to] as const,
 }

@@ -15,6 +15,12 @@ export interface DocTypeConfig {
   /** Payments settle open items of this target type. */
   appliesTo: 'invoice' | 'bill' | null
   lineHint: string
+  /**
+   * Account types offered for document lines. The AR/AP control accounts are
+   * always excluded — the engine posts those sides itself (and rejects them
+   * server-side since 20260812001500).
+   */
+  lineAccountTypes: string[]
 }
 
 export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
@@ -30,6 +36,7 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     hasBank: false,
     appliesTo: null,
     lineHint: 'Income accounts — what was sold',
+    lineAccountTypes: ['income'],
   },
   bill: {
     type: 'bill',
@@ -43,6 +50,7 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     hasBank: false,
     appliesTo: null,
     lineHint: 'Expense or asset accounts — what was bought',
+    lineAccountTypes: ['expense', 'asset'],
   },
   receipt: {
     type: 'receipt',
@@ -56,6 +64,7 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     hasBank: true,
     appliesTo: 'invoice',
     lineHint: '',
+    lineAccountTypes: [],
   },
   disbursement: {
     type: 'disbursement',
@@ -69,6 +78,7 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     hasBank: true,
     appliesTo: 'bill',
     lineHint: 'Direct expenses paid without a bill (optional)',
+    lineAccountTypes: ['expense', 'asset'],
   },
 }
 

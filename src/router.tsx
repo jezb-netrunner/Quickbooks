@@ -17,6 +17,10 @@ import { JournalPage } from './features/journal/routes/JournalPage'
 import { PeriodsPage } from './features/periods/routes/PeriodsPage'
 import { TrialBalancePage } from './features/reports/routes/TrialBalancePage'
 import { AgingPage } from './features/reports/routes/AgingPage'
+import { PnlPage } from './features/reports/routes/PnlPage'
+import { BalanceSheetPage } from './features/reports/routes/BalanceSheetPage'
+import { CashFlowPage } from './features/reports/routes/CashFlowPage'
+import { GeneralLedgerPage } from './features/reports/routes/GeneralLedgerPage'
 import { ContactsPage } from './features/contacts/routes/ContactsPage'
 import { DocumentsPage } from './features/documents/DocumentsPage'
 
@@ -51,6 +55,10 @@ export const router = createBrowserRouter(
             { path: 'journal', element: <JournalPage /> },
             { path: 'periods', element: <PeriodsPage /> },
             { path: 'trial-balance', element: <TrialBalancePage /> },
+            { path: 'profit-and-loss', element: <PnlPage /> },
+            { path: 'balance-sheet', element: <BalanceSheetPage /> },
+            { path: 'cash-flow', element: <CashFlowPage /> },
+            { path: 'general-ledger', element: <GeneralLedgerPage /> },
             { path: 'aging', element: <AgingPage /> },
             { path: 'settings', element: <ClientSettingsPage /> },
           ],

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Amount, Card, DataTable, ExportMenu, Input, type Column } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
@@ -20,6 +21,7 @@ async function fetchTrialBalance(clientId: string, from: string, to: string): Pr
 
 export function TrialBalancePage() {
   const client = useActiveClient()
+  const navigate = useNavigate()
   const year = new Date().getFullYear()
   const [from, setFrom] = useState(`${year}-01-01`)
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
@@ -59,7 +61,7 @@ export function TrialBalancePage() {
     <>
       <TopBar
         title="Trial balance"
-        subtitle="Posted entries only, drillable by the journal"
+        subtitle="Posted entries only — click a row to open its general ledger"
         actions={
           <ExportMenu
             disabled={withActivity.length === 0}
@@ -84,6 +86,7 @@ export function TrialBalancePage() {
             rows={withActivity}
             columns={columns}
             rowKey={(r) => r.account_id}
+            onRowClick={(r) => navigate(`/c/${client.id}/general-ledger?account=${r.account_id}`)}
             emptyMessage={isPending ? 'Computing…' : 'No posted activity in this range.'}
             dense
           />
