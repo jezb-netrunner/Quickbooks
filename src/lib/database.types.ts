@@ -8,6 +8,10 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 export type MembershipRole = 'firm_admin' | 'reviewer' | 'staff' | 'client_viewer'
 export type ReportingBasis = 'accrual' | 'cash'
+export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense'
+export type NormalBalance = 'debit' | 'credit'
+export type PeriodStatus = 'open' | 'closed' | 'locked'
+export type EntryStatus = 'draft' | 'posted'
 
 export interface Database {
   public: {
@@ -144,6 +148,128 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      accounts: {
+        Row: {
+          id: string
+          client_id: string
+          code: string
+          name: string
+          account_type: AccountType
+          normal_balance: NormalBalance
+          parent_id: string | null
+          archived_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          code: string
+          name: string
+          account_type: AccountType
+          normal_balance: NormalBalance
+          parent_id?: string | null
+        }
+        Update: {
+          code?: string
+          name?: string
+          parent_id?: string | null
+          archived_at?: string | null
+        }
+        Relationships: []
+      }
+      dimensions: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          archived_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: { client_id: string; name: string }
+        Update: { name?: string; archived_at?: string | null }
+        Relationships: []
+      }
+      coa_template: {
+        Row: {
+          code: string
+          name: string
+          account_type: AccountType
+          normal_balance: NormalBalance
+          parent_code: string | null
+          sort_order: number
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      periods: {
+        Row: {
+          id: string
+          client_id: string
+          period_start: string
+          period_end: string
+          status: PeriodStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      journal_entries: {
+        Row: {
+          id: string
+          client_id: string
+          entry_no: number | null
+          entry_date: string
+          period_id: string | null
+          status: EntryStatus
+          source_type: 'manual' | 'opening_balance' | 'reversal'
+          memo: string
+          reversal_of: string | null
+          reversed_by: string | null
+          created_by: string | null
+          posted_by: string | null
+          posted_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: { client_id: string; entry_date: string; memo?: string }
+        Update: { entry_date?: string; memo?: string }
+        Relationships: []
+      }
+      journal_lines: {
+        Row: {
+          id: string
+          entry_id: string
+          client_id: string
+          line_no: number
+          account_id: string
+          debit: string
+          credit: string
+          dimension_id: string | null
+        }
+        Insert: {
+          entry_id: string
+          client_id: string
+          line_no: number
+          account_id: string
+          debit?: number | string
+          credit?: number | string
+          dimension_id?: string | null
+        }
+        Update: {
+          line_no?: number
+          account_id?: string
+          debit?: number | string
+          credit?: number | string
+          dimension_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -178,6 +304,42 @@ export interface Database {
         Args: { p_membership_id: string; p_client_ids: string[] }
         Returns: undefined
       }
+      seed_client_coa: {
+        Args: { p_client_id: string }
+        Returns: number
+      }
+      close_period: {
+        Args: { p_period_id: string }
+        Returns: undefined
+      }
+      reopen_period: {
+        Args: { p_period_id: string }
+        Returns: undefined
+      }
+      lock_period: {
+        Args: { p_period_id: string }
+        Returns: undefined
+      }
+      post_entry: {
+        Args: { p_entry_id: string }
+        Returns: number
+      }
+      reverse_entry: {
+        Args: { p_entry_id: string; p_date?: string | null; p_memo?: string | null }
+        Returns: string
+      }
+      trial_balance: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          account_id: string
+          code: string
+          name: string
+          account_type: AccountType
+          normal_balance: NormalBalance
+          total_debit: string
+          total_credit: string
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -189,3 +351,8 @@ export type Firm = Database['public']['Tables']['firms']['Row']
 export type Membership = Database['public']['Tables']['memberships']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type ClientAssignment = Database['public']['Tables']['client_assignments']['Row']
+export type Account = Database['public']['Tables']['accounts']['Row']
+export type Period = Database['public']['Tables']['periods']['Row']
+export type JournalEntry = Database['public']['Tables']['journal_entries']['Row']
+export type JournalLine = Database['public']['Tables']['journal_lines']['Row']
+export type TrialBalanceRow = Database['public']['Functions']['trial_balance']['Returns'][number]
