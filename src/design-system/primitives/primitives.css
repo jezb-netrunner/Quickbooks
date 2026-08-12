@@ -129,6 +129,10 @@
 }
 .fis-control--sm { height: var(--control-h-sm); }
 .fis-control:focus-within { border-color: var(--border-focus); box-shadow: var(--focus-ring); }
+/* The wrapper carries the one focus ring; without this, the global
+   :focus-visible rule draws a second ring on the inner input. */
+.fis-control input:focus-visible,
+.fis-control select:focus-visible { outline: none; box-shadow: none; }
 .fis-control--error { border-color: var(--clay-500); }
 .fis-control input, .fis-control select {
   flex: 1;

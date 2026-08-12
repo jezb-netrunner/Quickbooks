@@ -3,7 +3,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(16);
 
 \ir 000_fixture.sql.inc
 
@@ -31,8 +31,18 @@ select throws_like(
   'unverified accounts cannot create firms'
 );
 
--- Direct DML dies at the grant wall
+-- Admins can insert a client AND read it back in the same statement — the
+-- browser's insert().select() path. Regression: a select policy that looks the
+-- checked row up in clients cannot see a row its own statement is inserting
+-- (statement snapshot), which broke RETURNING for legitimate admins.
 select tap.login('22222222-2222-4222-8222-222222222201');
+select lives_ok(
+  $$ insert into public.clients (firm_id, name)
+     values (tap.v('firm_a'), 'Returning Co') returning id, name $$,
+  'insert with RETURNING succeeds for a firm admin'
+);
+
+-- Direct DML dies at the grant wall
 select throws_ok(
   $$ insert into public.firms (name, created_by)
      values ('Forged', '22222222-2222-4222-8222-222222222201') $$,

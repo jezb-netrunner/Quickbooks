@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { messageOf } from '@/lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Badge,
@@ -125,7 +126,7 @@ function ClientsTab({ firmId, clients, onDone }: { firmId: string; clients: Clie
                 setAdding(false)
                 onDone(`${c.name} added`)
               },
-              onError: (err) => setError(err instanceof Error ? err.message : 'Could not add the client.'),
+              onError: (err) => setError(messageOf(err, 'Could not add the client.')),
             })
           }}
         />
@@ -244,7 +245,7 @@ function MembersTab({
                   setAdding(false)
                   onDone('Member added')
                 },
-                onError: (err) => setError(err instanceof Error ? err.message : 'Could not add the member.'),
+                onError: (err) => setError(messageOf(err, 'Could not add the member.')),
               },
             )
           }}
@@ -275,7 +276,7 @@ function MembersTab({
                   setEditing(null)
                   onDone('Member updated')
                 },
-                onError: (err) => setError(err instanceof Error ? err.message : 'Could not update the member.'),
+                onError: (err) => setError(messageOf(err, 'Could not update the member.')),
               },
             )
           }}
@@ -305,7 +306,7 @@ function MembersTab({
                   },
                   onError: (err) => {
                     setRemoving(null)
-                    setError(err instanceof Error ? err.message : 'Could not remove the member.')
+                    setError(messageOf(err, 'Could not remove the member.'))
                   },
                 })
               }}
@@ -337,7 +338,7 @@ function FirmTab({ firmId, firmName, onDone }: { firmId: string; firmName: strin
             setError(null)
             renameFirm.mutate(name.trim(), {
               onSuccess: () => onDone('Firm renamed'),
-              onError: (err) => setError(err instanceof Error ? err.message : 'Rename failed.'),
+              onError: (err) => setError(messageOf(err, 'Rename failed.')),
             })
           }}
           style={{ display: 'grid', gap: 14 }}

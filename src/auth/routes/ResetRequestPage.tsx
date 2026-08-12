@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { messageOf } from '@/lib/errors'
 import { Link } from 'react-router-dom'
 import { Button, Input } from '@/design-system'
 import { AuthCard, FormError } from '../AuthCard'
@@ -18,7 +19,7 @@ export function ResetRequestPage() {
       await requestPasswordReset(email)
       setSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed.')
+      setError(messageOf(err, 'Request failed.'))
     } finally {
       setBusy(false)
     }
