@@ -1,0 +1,44 @@
+name: db-tests
+
+# Runs on every push and PR: a fresh local Supabase stack, every migration
+# applied in order to an empty database (non-negotiable #5, verified
+# mechanically by `db reset`), then the pgTAP isolation suite, then the
+# frontend gate.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local database
+        run: supabase db start
+      - name: Apply all migrations to a fresh database
+        run: supabase db reset
+      - name: Run pgTAP isolation suite
+        run: supabase test db
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Build (placeholder env — build-time validation only)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: http://127.0.0.1:54321
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
