@@ -2,10 +2,15 @@ import { useMemo, useState } from 'react'
 import { messageOf } from '@/lib/errors'
 import { Amount, Button, Checkbox, Dialog, IconButton, Input, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
-import type { Account, Contact, DocumentRow } from '@/lib/database.types'
+import type { Account, Contact, DocumentRow, Item, OpenItemRow } from '@/lib/database.types'
+import { AttachmentsSection } from '@/features/attachments/AttachmentsSection'
+import { useIsFirmAdmin } from '@/features/clients/hooks'
+import { useSubmitDocument } from '@/features/review/hooks'
 import { useTaxCodes } from '@/features/tax/hooks'
+import { useItems } from '@/features/inventory/hooks'
 import type { TaxCodeWithRate } from '@/features/tax/api'
-import { docLabel, type DocTypeConfig } from './docTypes'
+import { docLabel, openItemRef, type DocTypeConfig } from './docTypes'
+import { localToday } from '@/lib/dates'
 import {
   useDeleteDocument,
   useDocumentDetail,
@@ -16,6 +21,8 @@ import {
 } from './hooks'
 
 interface EditableLine {
+  item_id: string
+  qty: string
   account_id: string
   description: string
   amount: string
@@ -29,15 +36,21 @@ interface EditableApplication {
   amount: string
 }
 
+// Half-away-from-zero at 2 decimals, immune to float dust (102.50 * 0.01 =
+// 1.0250000000000001 must round to 1.03, matching Postgres numeric round()).
+function round2(x: number): number {
+  return Math.round(Number((x * 100).toFixed(4))) / 100
+}
+
 // Client-side preview of the engine's per-line VAT math (the engine recomputes
 // authoritatively at issue, by document date). Inclusive: net = amount/(1+r).
 function lineTax(amount: number, rate: number | null, inclusive: boolean) {
   if (!rate || amount <= 0) return { net: amount, tax: 0 }
   if (inclusive) {
-    const net = Math.round((amount / (1 + rate)) * 100) / 100
-    return { net, tax: Math.round((amount - net) * 100) / 100 }
+    const net = round2(amount / (1 + rate))
+    return { net, tax: round2(amount - net) }
   }
-  return { net: amount, tax: Math.round(amount * rate * 100) / 100 }
+  return { net: amount, tax: round2(amount * rate) }
 }
 
 export function DocumentDialog(props: {
@@ -46,16 +59,34 @@ export function DocumentDialog(props: {
   contacts: Contact[]
   accounts: Account[]
   document: DocumentRow | null
+  requireApproval: boolean
   onClose: () => void
   onDone: (msg: string) => void
 }) {
   const { data: detail, isPending } = useDocumentDetail(props.clientId, props.document?.id ?? null)
   const { data: taxCodes } = useTaxCodes(props.clientId)
-  if ((props.document && isPending) || taxCodes === undefined) return null
+  // Payments must not render before open items resolve: the form's replace-set
+  // save would otherwise serialize an empty application list and silently
+  // delete a saved draft's applications.
+  const { data: openItems } = useOpenItems(
+    props.clientId,
+    props.config.appliesTo ?? 'receivable',
+    localToday(),
+  )
+  const { data: items } = useItems(props.clientId)
+  if (
+    (props.document && isPending) ||
+    taxCodes === undefined ||
+    items === undefined ||
+    (props.config.appliesTo !== null && openItems === undefined)
+  )
+    return null
   return (
     <DocumentForm
       {...props}
       taxCodes={taxCodes}
+      items={items}
+      openItems={openItems ?? []}
       detail={detail ?? { lines: [], applications: [] }}
     />
   )
@@ -67,7 +98,10 @@ function DocumentForm({
   contacts,
   accounts,
   taxCodes,
+  items,
+  openItems,
   document: doc,
+  requireApproval,
   detail,
   onClose,
   onDone,
@@ -77,21 +111,37 @@ function DocumentForm({
   contacts: Contact[]
   accounts: Account[]
   taxCodes: TaxCodeWithRate[]
+  items: Item[]
+  openItems: OpenItemRow[]
   document: DocumentRow | null
+  requireApproval: boolean
   detail: {
-    lines: { account_id: string; description: string; amount: string; tax_code_id: string | null }[]
+    lines: {
+      account_id: string
+      description: string
+      amount: string
+      tax_code_id: string | null
+      item_id: string | null
+      qty: string | null
+    }[]
     applications: { target_document_id: string; amount: string }[]
   }
   onClose: () => void
   onDone: (msg: string) => void
 }) {
   const isIssued = doc !== null && doc.status !== 'draft'
+  const isSubmitted = doc?.status === 'submitted'
+  const isAdmin = useIsFirmAdmin()
+  // Same shape as the journal: the database gate is the enforcement, this
+  // only swaps the primary action for preparers under the approval regime.
+  const mustSubmit = requireApproval && !isAdmin
   const save = useSaveDocument(clientId, config.type)
   const remove = useDeleteDocument(clientId)
   const issue = useIssueDocument(clientId)
   const voidDoc = useVoidDocument(clientId)
+  const submitDoc = useSubmitDocument(clientId)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localToday()
   const [docDate, setDocDate] = useState(doc?.doc_date ?? today)
   const [dueDate, setDueDate] = useState(doc?.due_date ?? '')
   const [contactId, setContactId] = useState(doc?.contact_id ?? '')
@@ -106,13 +156,15 @@ function DocumentForm({
   const [lines, setLines] = useState<EditableLine[]>(
     detail.lines.length > 0
       ? detail.lines.map((l) => ({
+          item_id: l.item_id ?? '',
+          qty: l.qty != null ? String(Number(l.qty)) : '',
           account_id: l.account_id,
           description: l.description,
           amount: String(l.amount),
           tax_code_id: l.tax_code_id ?? '',
         }))
-      : config.hasLines && config.type !== 'disbursement'
-        ? [{ account_id: '', description: '', amount: '', tax_code_id: '' }]
+      : config.hasLines
+        ? [{ item_id: '', qty: '', account_id: '', description: '', amount: '', tax_code_id: '' }]
         : [],
   )
   const [error, setError] = useState<string | null>(null)
@@ -139,13 +191,15 @@ function DocumentForm({
       accounts.filter(
         (a) =>
           referenced.has(a.id) ||
+          (config.hasItems && a.code === '1200' && !a.archived_at) ||
           (!a.archived_at &&
             config.lineAccountTypes.includes(a.account_type) &&
             a.code !== '1100' &&
             a.code !== '2000' &&
+            a.code !== '1200' &&
             !taxAccountCodes.has(a.code)),
       ),
-    [accounts, config.lineAccountTypes, referenced, taxAccountCodes],
+    [accounts, config.hasItems, config.lineAccountTypes, referenced, taxAccountCodes],
   )
   const lineTaxCodes = useMemo(
     () => taxCodes.filter((t) => t.active && t.kind === config.lineTaxKind),
@@ -160,9 +214,36 @@ function DocumentForm({
     for (const t of taxCodes) m.set(t.id, t.currentRate)
     return m
   }, [taxCodes])
+  const activeItems = useMemo(() => items.filter((i) => !i.archived_at), [items])
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
+  // Purchases post item lines to the 1200 Inventory control account.
+  const inventoryAccount = useMemo(() => accounts.find((a) => a.code === '1200'), [accounts])
 
-  // Open items of the chosen contact, for payments
-  const { data: openItems } = useOpenItems(clientId, config.appliesTo ?? 'invoice', today)
+  // Picking an item wires the line: account (income for sales, 1200 for
+  // purchases), default amount from qty x default price/cost.
+  function applyItem(i: number, itemId: string, qtyStr: string) {
+    const item = itemId ? itemById.get(itemId) : undefined
+    const qty = Number(qtyStr) || 0
+    const price = config.type === 'invoice' ? item?.sales_price : item?.purchase_cost
+    setLines((prev) =>
+      prev.map((l, idx) => {
+        if (idx !== i) return l
+        const next = { ...l, item_id: itemId, qty: qtyStr }
+        if (item) {
+          next.account_id =
+            config.type === 'purchase'
+              ? (inventoryAccount?.id ?? l.account_id)
+              : (item.income_account_id ?? l.account_id)
+          if (!next.description) next.description = item.name
+          if (qty > 0 && price != null) next.amount = String(round2(qty * Number(price)))
+        }
+        return next
+      }),
+    )
+  }
+
+  // Open items of the chosen contact, for payments (fetched by the wrapper
+  // before this form mounts — see DocumentDialog).
   const savedApplied = useMemo(
     () => new Map(detail.applications.map((a) => [a.target_document_id, Number(a.amount)])),
     [detail.applications],
@@ -170,12 +251,12 @@ function DocumentForm({
   const [applications, setApplications] = useState<EditableApplication[] | null>(null)
   const appRows: EditableApplication[] = useMemo(() => {
     if (applications) return applications
-    if (!config.appliesTo || !openItems) return []
+    if (!config.appliesTo) return []
     return openItems
       .filter((o) => o.contact_id === contactId)
       .map((o) => ({
         target_document_id: o.document_id,
-        label: `${config.appliesTo === 'invoice' ? 'INV' : 'BILL'}-${o.doc_no} · ${o.doc_date}`,
+        label: `${openItemRef(o.doc_type, o.doc_no)} · ${o.doc_date}`,
         // Draft applications never count toward open_items, so the balance
         // shown is the true headroom even while re-editing this draft.
         open: Number(o.balance),
@@ -191,34 +272,47 @@ function DocumentForm({
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
   }
 
-  const lineTotal = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  // Only lines toDraft() will actually keep count toward totals and gating —
+  // an amount with no account chosen must not inflate the total or enable
+  // issuing a smaller document than the screen shows.
+  const completeLines = useMemo(
+    () =>
+      lines.filter(
+        (l) => l.account_id && Number(l.amount) > 0 && (!l.item_id || Number(l.qty) > 0),
+      ),
+    [lines],
+  )
+  const lineTotal = completeLines.reduce((s, l) => s + Number(l.amount), 0)
+  const hasIncompleteLine = lines.some(
+    (l) =>
+      (Number(l.amount) > 0 && !l.account_id) ||
+      (l.item_id !== '' && !(Number(l.qty) > 0)) ||
+      (l.item_id !== '' && !(Number(l.amount) > 0)),
+  )
   const appTotal = appRows.reduce((s, a) => s + (Number(a.amount) || 0), 0)
 
   // Live tax preview mirroring the engine's math.
   const taxPreview = useMemo(() => {
     let net = 0
     let vat = 0
-    for (const l of lines) {
-      const amount = Number(l.amount) || 0
-      if (amount <= 0) continue
+    for (const l of completeLines) {
+      const amount = Number(l.amount)
       const r = l.tax_code_id ? (rateOf.get(l.tax_code_id) ?? null) : null
       const t = lineTax(amount, r, inclusive)
       net += t.net
       vat += t.tax
     }
-    return { net: Math.round(net * 100) / 100, vat: Math.round(vat * 100) / 100 }
-  }, [lines, rateOf, inclusive])
+    return { net: round2(net), vat: round2(vat) }
+  }, [completeLines, rateOf, inclusive])
   const whtRate = whtCodeId ? (rateOf.get(whtCodeId) ?? null) : null
-  const whtAmount =
-    whtCodeId && whtRate && Number(whtBase) > 0
-      ? Math.round(Number(whtBase) * whtRate * 100) / 100
-      : 0
+  const whtAmount = whtCodeId && whtRate && Number(whtBase) > 0 ? round2(Number(whtBase) * whtRate) : 0
   const docGross = taxPreview.net + taxPreview.vat
   const grandTotal =
-    config.type === 'invoice' || config.type === 'bill'
-      ? docGross
-      : appTotal + docGross - whtAmount
-  const issueGate = config.type === 'invoice' || config.type === 'bill' ? lineTotal : appTotal + lineTotal
+    config.appliesTo === null ? docGross : appTotal + docGross - whtAmount
+  const issueGate =
+    (config.appliesTo === null ? lineTotal : appTotal + lineTotal) > 0 &&
+    !hasIncompleteLine &&
+    !(config.hasBank && !bankAccountId)
 
   function toDraft() {
     return {
@@ -234,12 +328,14 @@ function DocumentForm({
       whtTaxCodeId: config.whtKind && whtCodeId ? whtCodeId : null,
       whtBase: config.whtKind && whtCodeId && Number(whtBase) > 0 ? Number(whtBase) : null,
       lines: lines
-        .filter((l) => l.account_id && Number(l.amount) > 0)
+        .filter((l) => l.account_id && Number(l.amount) > 0 && (!l.item_id || Number(l.qty) > 0))
         .map((l) => ({
           account_id: l.account_id,
           description: l.description.trim(),
           amount: Number(l.amount),
           tax_code_id: l.tax_code_id || null,
+          item_id: l.item_id || null,
+          qty: l.item_id && Number(l.qty) > 0 ? Number(l.qty) : null,
         })),
       applications: appRows
         .filter((a) => Number(a.amount) > 0)
@@ -247,23 +343,32 @@ function DocumentForm({
     }
   }
 
-  const busy = save.isPending || remove.isPending || issue.isPending || voidDoc.isPending
+  const busy = save.isPending || remove.isPending || issue.isPending || voidDoc.isPending || submitDoc.isPending
   const title = doc ? `${docLabel(config, doc.doc_no)} · ${doc.status}` : `New ${config.noun}`
   const showTaxColumn = config.lineTaxKind !== null && lineTaxCodes.length > 0
-  const lineGrid = showTaxColumn
-    ? 'minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.7fr) 100px 34px'
-    : 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px'
+  const showItemColumn = config.hasItems && activeItems.length > 0
+  const lineGrid = showItemColumn
+    ? showTaxColumn
+      ? 'minmax(0, 1fr) 64px minmax(0, 1fr) minmax(0, 0.9fr) 100px 34px'
+      : 'minmax(0, 1fr) 64px minmax(0, 1fr) minmax(0, 0.9fr) 110px 34px'
+    : showTaxColumn
+      ? 'minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.7fr) 100px 34px'
+      : 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px'
 
   return (
     <Dialog
       open
       onClose={onClose}
-      width={showTaxColumn ? 720 : 640}
+      width={showItemColumn ? 780 : showTaxColumn ? 720 : 640}
       title={title}
       description={
-        isIssued
-          ? 'Issued documents are immutable. Corrections go through void, which posts a reversing entry.'
-          : 'Drafts are editable; issuing posts the journal entry and assigns the number.'
+        isSubmitted
+          ? 'Locked while under review — a firm admin approves or returns it from the Approvals page.'
+          : isIssued
+            ? 'Issued documents are immutable. Corrections go through void, which posts a reversing entry.'
+            : mustSubmit
+              ? 'Drafts are editable; this client requires review, so submitting sends the document to a firm admin.'
+              : 'Drafts are editable; issuing posts the journal entry and assigns the number.'
       }
       footer={
         isIssued ? (
@@ -324,22 +429,27 @@ function DocumentForm({
             </Button>
             <Button
               variant="accent"
-              disabled={busy || !contactId || issueGate <= 0 || (config.hasSettlement && settleCash && !bankAccountId)}
+              disabled={busy || !contactId || !issueGate || (config.hasSettlement && settleCash && !bankAccountId)}
               onClick={() =>
                 save.mutate(
                   { documentId: doc?.id ?? null, draft: toDraft() },
                   {
                     onSuccess: (id) =>
-                      issue.mutate(id, {
-                        onSuccess: (no) => { onDone(`Issued as ${config.prefix}-${no}`); onClose() },
-                        onError: (err) => setError(messageOf(err, 'Could not issue the document.')),
-                      }),
+                      mustSubmit
+                        ? submitDoc.mutate(id, {
+                            onSuccess: () => { onDone('Submitted for review'); onClose() },
+                            onError: (err) => setError(messageOf(err, 'Could not submit the document.')),
+                          })
+                        : issue.mutate(id, {
+                            onSuccess: (no) => { onDone(`Issued as ${config.prefix}-${no}`); onClose() },
+                            onError: (err) => setError(messageOf(err, 'Could not issue the document.')),
+                          }),
                     onError: (err) => setError(messageOf(err, 'Could not save the draft.')),
                   },
                 )
               }
             >
-              {busy ? 'Working' : 'Save and issue'}
+              {busy ? 'Working' : mustSubmit ? 'Save and submit' : 'Save and issue'}
             </Button>
           </>
         )
@@ -347,6 +457,13 @@ function DocumentForm({
     >
       <div style={{ display: 'grid', gap: 14 }}>
         <FormError message={error} />
+        {doc?.status === 'draft' && doc.review_note !== '' && (
+          <div style={{ padding: '10px 12px', background: 'var(--sand-100)', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ font: 'var(--type-body-sm)', color: 'var(--clay-600)' }}>
+              Returned for changes: {doc.review_note}
+            </p>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: config.hasDueDate ? 'minmax(0, 1fr) 140px 140px' : 'minmax(0, 1fr) 170px', gap: 12 }}>
           <Select
             label={config.contactSide === 'customer' ? 'Customer' : 'Vendor'}
@@ -366,8 +483,8 @@ function DocumentForm({
             <Select
               label="Settlement"
               options={[
-                { value: 'on_account', label: 'On account — receivable' },
-                { value: 'cash', label: 'Paid now — cash or bank' },
+                { value: 'on_account', label: config.settleOnAccountLabel },
+                { value: 'cash', label: config.settleCashLabel },
               ]}
               value={settleCash ? 'cash' : 'on_account'}
               disabled={isIssued}
@@ -379,7 +496,7 @@ function DocumentForm({
             />
             {settleCash && (
               <Select
-                label="Deposit to"
+                label={config.contactSide === 'customer' ? 'Deposit to' : 'Paid from'}
                 placeholder="Cash or bank account"
                 options={bankAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }))}
                 value={bankAccountId}
@@ -404,7 +521,7 @@ function DocumentForm({
         {config.appliesTo && (
           <div style={{ display: 'grid', gap: 8 }}>
             <span style={{ font: 'var(--type-overline)', letterSpacing: 'var(--tracking-caps)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Apply to open {config.appliesTo === 'invoice' ? 'invoices' : 'bills'}
+              Apply to open {config.appliesTo === 'receivable' ? 'invoices' : 'bills and purchases'}
             </span>
             {!contactId ? (
               <p style={{ font: 'var(--type-body-sm)', color: 'var(--text-muted)' }}>
@@ -490,21 +607,45 @@ function DocumentForm({
             </div>
             {lines.map((line, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: lineGrid, gap: 8, alignItems: 'center' }}>
+                {showItemColumn && (
+                  <>
+                    <Select
+                      aria-label={`Line ${i + 1} item`}
+                      placeholder="No item — service"
+                      options={activeItems.map((it) => ({ value: it.id, label: `${it.sku} ${it.name}` }))}
+                      value={line.item_id}
+                      disabled={isIssued}
+                      onChange={(e) => applyItem(i, e.target.value, line.qty || '1')}
+                    />
+                    <Input
+                      aria-label={`Line ${i + 1} quantity`}
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      placeholder="Qty"
+                      value={line.qty}
+                      disabled={isIssued || !line.item_id}
+                      onChange={(e) => applyItem(i, line.item_id, e.target.value)}
+                    />
+                  </>
+                )}
                 <Select
                   aria-label={`Line ${i + 1} account`}
                   placeholder="Account"
                   options={lineAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }))}
                   value={line.account_id}
-                  disabled={isIssued}
+                  disabled={isIssued || (config.type === 'purchase' && line.item_id !== '')}
                   onChange={(e) => setLine(i, { account_id: e.target.value })}
                 />
-                <Input
-                  aria-label={`Line ${i + 1} description`}
-                  placeholder="Description"
-                  value={line.description}
-                  disabled={isIssued}
-                  onChange={(e) => setLine(i, { description: e.target.value })}
-                />
+                {!showItemColumn && (
+                  <Input
+                    aria-label={`Line ${i + 1} description`}
+                    placeholder="Description"
+                    value={line.description}
+                    disabled={isIssued}
+                    onChange={(e) => setLine(i, { description: e.target.value })}
+                  />
+                )}
                 {showTaxColumn && (
                   <Select
                     aria-label={`Line ${i + 1} tax`}
@@ -525,7 +666,7 @@ function DocumentForm({
                   disabled={isIssued}
                   onChange={(e) => setLine(i, { amount: e.target.value })}
                 />
-                {!isIssued && lines.length > (config.type === 'disbursement' ? 0 : 1) ? (
+                {!isIssued && lines.length > 1 ? (
                   <IconButton icon="x" label={`Remove line ${i + 1}`} size={14} onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} />
                 ) : (
                   <span />
@@ -534,7 +675,7 @@ function DocumentForm({
             ))}
             {!isIssued && (
               <div>
-                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { account_id: '', description: '', amount: '', tax_code_id: '' }])}>
+                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { item_id: '', qty: '', account_id: '', description: '', amount: '', tax_code_id: '' }])}>
                   Add line
                 </Button>
               </div>
@@ -568,6 +709,10 @@ function DocumentForm({
             <Amount value={grandTotal} />
           </div>
         </div>
+
+        {doc && (
+          <AttachmentsSection clientId={clientId} target={{ documentId: doc.id }} canWrite={!isSubmitted} />
+        )}
       </div>
     </Dialog>
   )

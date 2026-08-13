@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { keys } from '@/lib/queryKeys'
+import { keys, ledgerReportPrefixes } from '@/lib/queryKeys'
 import {
   deleteDraft,
   fetchEntries,
@@ -28,6 +28,13 @@ function useInvalidateJournal(clientId: string) {
     void qc.invalidateQueries({ queryKey: keys.entries(clientId) })
     void qc.invalidateQueries({ queryKey: ['entry-lines', clientId] })
     void qc.invalidateQueries({ queryKey: keys.periods(clientId) })
+    void qc.invalidateQueries({ queryKey: keys.dashboard(clientId) })
+    // Posting rewrites every ledger-derived report.
+    void qc.invalidateQueries({ queryKey: ['open-items', clientId] })
+    void qc.invalidateQueries({ queryKey: ['aging', clientId] })
+    for (const prefix of ledgerReportPrefixes) {
+      void qc.invalidateQueries({ queryKey: [prefix, clientId] })
+    }
   }
 }
 

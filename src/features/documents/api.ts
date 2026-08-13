@@ -35,9 +35,11 @@ export async function fetchDocumentDetail(documentId: string): Promise<DocumentD
   return { lines: lines.data, applications: applications.data }
 }
 
+// docType takes an exact type ('invoice', 'bill', 'purchase') or a side
+// ('receivable', 'payable' = bills + purchases).
 export async function fetchOpenItems(
   clientId: string,
-  docType: 'invoice' | 'bill',
+  docType: string,
   asOf: string,
 ): Promise<OpenItemRow[]> {
   const { data, error } = await supabase.rpc('open_items', {
@@ -58,7 +60,14 @@ export interface DraftDocumentInput {
   amountsIncludeTax: boolean
   whtTaxCodeId: string | null
   whtBase: number | null
-  lines: { account_id: string; description: string; amount: number; tax_code_id: string | null }[]
+  lines: {
+    account_id: string
+    description: string
+    amount: number
+    tax_code_id: string | null
+    item_id: string | null
+    qty: number | null
+  }[]
   applications: { target_document_id: string; amount: number }[]
 }
 
@@ -110,6 +119,8 @@ export async function saveDocumentDraft(
         description: l.description,
         amount: l.amount,
         tax_code_id: l.tax_code_id,
+        item_id: l.item_id,
+        qty: l.qty,
       })),
     )
     if (error) throw error

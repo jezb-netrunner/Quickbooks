@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { RequireAuth } from './auth/RequireAuth'
 import { LoginPage } from './auth/routes/LoginPage'
 import { SignupPage } from './auth/routes/SignupPage'
@@ -23,8 +23,18 @@ import { CashFlowPage } from './features/reports/routes/CashFlowPage'
 import { GeneralLedgerPage } from './features/reports/routes/GeneralLedgerPage'
 import { BirBooksPage } from './features/reports/routes/BirBooksPage'
 import { TaxCodesPage } from './features/tax/TaxCodesPage'
+import { WorkingPaperPage } from './features/compliance/WorkingPaperPage'
+import { WithholdingPage } from './features/compliance/WithholdingPage'
+import { FilingCalendarPage } from './features/compliance/FilingCalendarPage'
 import { ContactsPage } from './features/contacts/routes/ContactsPage'
 import { DocumentsPage } from './features/documents/DocumentsPage'
+import { ItemsPage } from './features/inventory/ItemsPage'
+import { AdjustmentsPage } from './features/inventory/AdjustmentsPage'
+import { ValuationPage } from './features/inventory/ValuationPage'
+import { CashAccountsPage } from './features/cash/CashAccountsPage'
+import { BankImportPage } from './features/banking/BankImportPage'
+import { ApprovalsPage } from './features/review/ApprovalsPage'
+import { PracticeDashboardPage } from './features/practice/PracticeDashboardPage'
 
 // The active client is always the /c/:clientId URL segment — never only local
 // state. Phase 2+ screens (coa, journal, periods, …) slot in as siblings of
@@ -43,16 +53,30 @@ export const router = createBrowserRouter(
         { path: '/select-client', element: <SelectClientPage /> },
         { path: '/create-firm', element: <CreateFirmPage /> },
         { path: '/firm', element: <FirmPage /> },
+        { path: '/practice', element: <PracticeDashboardPage /> },
         {
           path: '/c/:clientId',
           element: <ClientLayout />,
           children: [
             { index: true, element: <ClientOverviewPage /> },
-            { path: 'contacts', element: <ContactsPage /> },
+            { path: 'customers', element: <ContactsPage side="customer" /> },
+            { path: 'vendors', element: <ContactsPage side="vendor" /> },
             { path: 'invoices', element: <DocumentsPage docType="invoice" /> },
+            { path: 'collections', element: <DocumentsPage docType="receipt" /> },
+            { path: 'purchases', element: <DocumentsPage docType="purchase" /> },
             { path: 'bills', element: <DocumentsPage docType="bill" /> },
-            { path: 'money-in', element: <DocumentsPage docType="receipt" /> },
-            { path: 'money-out', element: <DocumentsPage docType="disbursement" /> },
+            { path: 'expenses', element: <DocumentsPage docType="expense" /> },
+            { path: 'payments', element: <DocumentsPage docType="disbursement" /> },
+            { path: 'items', element: <ItemsPage /> },
+            { path: 'stock-adjustments', element: <AdjustmentsPage /> },
+            { path: 'valuation', element: <ValuationPage /> },
+            { path: 'cash', element: <CashAccountsPage /> },
+            { path: 'bank-import', element: <BankImportPage /> },
+            { path: 'approvals', element: <ApprovalsPage /> },
+            // Old paths keep working: bookmarks predate the cycle regrouping.
+            { path: 'contacts', element: <Navigate to="../customers" replace /> },
+            { path: 'money-in', element: <Navigate to="../collections" replace /> },
+            { path: 'money-out', element: <Navigate to="../payments" replace /> },
             { path: 'coa', element: <CoaPage /> },
             { path: 'journal', element: <JournalPage /> },
             { path: 'periods', element: <PeriodsPage /> },
@@ -62,6 +86,11 @@ export const router = createBrowserRouter(
             { path: 'cash-flow', element: <CashFlowPage /> },
             { path: 'general-ledger', element: <GeneralLedgerPage /> },
             { path: 'bir-books', element: <BirBooksPage /> },
+            { path: 'vat', element: <WorkingPaperPage form="wp_vat" /> },
+            { path: 'percentage-tax', element: <WorkingPaperPage form="wp_percentage_tax" /> },
+            { path: 'income-tax', element: <WorkingPaperPage form="wp_income_tax" /> },
+            { path: 'withholding', element: <WithholdingPage /> },
+            { path: 'filing-calendar', element: <FilingCalendarPage /> },
             { path: 'aging', element: <AgingPage /> },
             { path: 'tax-codes', element: <TaxCodesPage /> },
             { path: 'settings', element: <ClientSettingsPage /> },

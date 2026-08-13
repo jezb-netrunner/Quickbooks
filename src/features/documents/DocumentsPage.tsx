@@ -5,9 +5,10 @@ import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { useAccounts } from '@/features/coa/hooks'
 import { useContacts } from '@/features/contacts/hooks'
 import type { DocType, DocumentRow } from '@/lib/database.types'
-import { DOC_TYPES, docLabel } from './docTypes'
+import { DOC_TYPES, docLabel, openItemRef } from './docTypes'
 import { DocumentDialog } from './DocumentDialog'
 import { useDocuments, useOpenItems } from './hooks'
+import { localToday } from '@/lib/dates'
 
 export function DocumentsPage({ docType }: { docType: DocType }) {
   const config = DOC_TYPES[docType]
@@ -15,9 +16,15 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
   const { data: documents } = useDocuments(client.id, docType)
   const { data: contacts } = useContacts(client.id)
   const { data: accounts } = useAccounts(client.id)
-  const today = new Date().toISOString().slice(0, 10)
-  const showsOpenItems = docType === 'invoice' || docType === 'bill'
-  const { data: openItems } = useOpenItems(client.id, showsOpenItems ? docType : 'invoice', today)
+  const today = localToday()
+  const showsOpenItems = docType === 'invoice' || docType === 'bill' || docType === 'purchase'
+  // Payment pages warm the open-items cache their dialog will need
+  // (payables for Payments, receivables for Collections).
+  const { data: openItems } = useOpenItems(
+    client.id,
+    showsOpenItems ? docType : (config.appliesTo ?? 'receivable'),
+    today,
+  )
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selected, setSelected] = useState<DocumentRow | null>(null)
@@ -61,6 +68,8 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
           <Badge tone="positive" dot>Issued</Badge>
         ) : d.status === 'voided' ? (
           <Badge tone="neutral" dot>Voided</Badge>
+        ) : d.status === 'submitted' ? (
+          <Badge tone="ink" dot>For review</Badge>
         ) : (
           <Badge tone="warning" dot>Draft</Badge>
         ),
@@ -113,7 +122,7 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
               rowKey={(o) => o.document_id}
               dense
               columns={[
-                { key: 'doc', header: 'No.', width: 100, render: (o) => <span style={{ font: '500 13px/1 var(--font-mono)' }}>{`${config.prefix}-${o.doc_no}`}</span> },
+                { key: 'doc', header: 'No.', width: 100, render: (o) => <span style={{ font: '500 13px/1 var(--font-mono)' }}>{openItemRef(o.doc_type, o.doc_no)}</span> },
                 { key: 'contact_name', header: config.contactSide === 'customer' ? 'Customer' : 'Vendor' },
                 { key: 'due_date', header: 'Due', width: 110, render: (o) => <span style={{ font: '400 13px/1 var(--font-mono)' }}>{o.due_date ?? '—'}</span> },
                 { key: 'overdue', header: 'Overdue', width: 90, render: (o) => (o.days_overdue > 0 ? <Badge tone="negative">{o.days_overdue}d</Badge> : <Badge tone="positive">Current</Badge>) },
@@ -130,6 +139,7 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
             contacts={contacts ?? []}
             accounts={accounts ?? []}
             document={selected}
+            requireApproval={client.require_approval}
             onClose={() => setDialogOpen(false)}
             onDone={setToast}
           />

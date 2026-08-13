@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { AgingRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchAging(clientId: string, docType: string, asOf: string): Promise<AgingRow[]> {
   const { data, error } = await supabase.rpc('aging', {
@@ -20,11 +21,12 @@ async function fetchAging(clientId: string, docType: string, asOf: string): Prom
 
 export function AgingPage() {
   const client = useActiveClient()
-  const [side, setSide] = useState('invoice')
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10))
-  const { data: rows, isPending } = useQuery({
+  const [side, setSide] = useState('receivable')
+  const [asOf, setAsOf] = useState(localToday())
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.aging(client.id, side, asOf),
     queryFn: () => fetchAging(client.id, side, asOf),
+    enabled: Boolean(asOf),
   })
 
   const totals = useMemo(() => {
@@ -39,10 +41,10 @@ export function AgingPage() {
     }
   }, [rows])
 
-  const sideLabel = side === 'invoice' ? 'Receivables' : 'Payables'
+  const sideLabel = side === 'receivable' ? 'Receivables' : 'Payables'
 
   const columns: Column<AgingRow>[] = [
-    { key: 'contact_name', header: side === 'invoice' ? 'Customer' : 'Vendor' },
+    { key: 'contact_name', header: side === 'receivable' ? 'Customer' : 'Vendor' },
     { key: 'current_amount', header: 'Current', width: 120, align: 'right', render: (r) => <Amount value={r.current_amount} dashZero /> },
     { key: 'days_1_30', header: '1–30', width: 110, align: 'right', render: (r) => <Amount value={r.days_1_30} dashZero /> },
     { key: 'days_31_60', header: '31–60', width: 110, align: 'right', render: (r) => <Amount value={r.days_31_60} dashZero /> },
@@ -53,10 +55,10 @@ export function AgingPage() {
 
   function report(): ReportExport {
     return {
-      filename: `${side === 'invoice' ? 'ar' : 'ap'}-aging_${client.code ?? client.name}_${asOf}`,
+      filename: `${side === 'receivable' ? 'ar' : 'ap'}-aging_${client.code ?? client.name}_${asOf}`,
       title: `${sideLabel} aging`,
       subtitle: [client.name, `As of ${asOf}`],
-      header: [side === 'invoice' ? 'Customer' : 'Vendor', 'Current', '1-30', '31-60', '61-90', 'Over 90', 'Total'],
+      header: [side === 'receivable' ? 'Customer' : 'Vendor', 'Current', '1-30', '31-60', '61-90', 'Over 90', 'Total'],
       rows: (rows ?? []).map((r) => [
         r.contact_name, r.current_amount, r.days_1_30, r.days_31_60, r.days_61_90, r.days_over_90, r.total,
       ]),
@@ -77,8 +79,8 @@ export function AgingPage() {
             value={side}
             onChange={setSide}
             items={[
-              { value: 'invoice', label: 'Receivables' },
-              { value: 'bill', label: 'Payables' },
+              { value: 'receivable', label: 'Receivables' },
+              { value: 'payable', label: 'Payables (bills + purchases)' },
             ]}
           />
           <Input label="As of" type="date" fieldSize="sm" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
@@ -88,7 +90,7 @@ export function AgingPage() {
             rows={rows ?? []}
             columns={columns}
             rowKey={(r) => r.contact_id}
-            emptyMessage={isPending ? 'Computing…' : `No open ${sideLabel.toLowerCase()} as of this date.`}
+            emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : `No open ${sideLabel.toLowerCase()} as of this date.`}
             dense
           />
           {(rows ?? []).length > 0 && (

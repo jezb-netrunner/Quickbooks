@@ -9,12 +9,12 @@ import type { Contact, ContactType } from '@/lib/database.types'
 
 const TYPE_LABEL: Record<ContactType, string> = { customer: 'Customer', vendor: 'Vendor', both: 'Customer and vendor' }
 
-export function ContactsPage() {
+export function ContactsPage({ side = 'all' }: { side?: 'all' | 'customer' | 'vendor' }) {
   const client = useActiveClient()
   const { data: contacts } = useContacts(client.id)
   const createContact = useCreateContact(client.id)
   const updateContact = useUpdateContact(client.id)
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState<string>(side)
   const [editing, setEditing] = useState<Contact | null>(null)
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,8 +52,8 @@ export function ContactsPage() {
   return (
     <>
       <TopBar
-        title="Customers and vendors"
-        subtitle="Everyone this client bills or pays"
+        title={side === 'customer' ? 'Customers' : side === 'vendor' ? 'Vendors' : 'Customers and vendors'}
+        subtitle={side === 'customer' ? 'Who this client bills' : side === 'vendor' ? 'Who this client buys from and pays' : 'Everyone this client bills or pays'}
         actions={
           <Button size="sm" iconLeft="plus" onClick={() => { setError(null); setAdding(true) }}>
             Add contact
@@ -83,6 +83,7 @@ export function ContactsPage() {
 
         {(adding || editing) && (
           <ContactDialog
+            defaultType={side === 'vendor' ? 'vendor' : 'customer'}
             contact={editing}
             error={error}
             busy={createContact.isPending || updateContact.isPending}
@@ -128,6 +129,7 @@ export function ContactsPage() {
 }
 
 function ContactDialog({
+  defaultType,
   contact,
   error,
   busy,
@@ -135,6 +137,7 @@ function ContactDialog({
   onSubmit,
   onArchiveToggle,
 }: {
+  defaultType: ContactType
   contact: Contact | null
   error: string | null
   busy: boolean
@@ -143,7 +146,7 @@ function ContactDialog({
   onArchiveToggle?: () => void
 }) {
   const [name, setName] = useState(contact?.name ?? '')
-  const [type, setType] = useState<ContactType>(contact?.contact_type ?? 'customer')
+  const [type, setType] = useState<ContactType>(contact?.contact_type ?? defaultType)
   const [tin, setTin] = useState(contact?.tin ?? '')
   const [email, setEmail] = useState(contact?.email ?? '')
 

@@ -260,7 +260,7 @@ select ok(
 select ok(
   (select gross = 560.00 and taxable = 500.00 and input_vat = 60.00
    from public.purchases_book(tap.v('a1'), date '2026-08-01', date '2026-08-31')
-   where doc_no = (select doc_no from public.documents where id = tap.v('bill1'))),
+   where ref = 'BILL-' || (select doc_no from public.documents where id = tap.v('bill1'))),
   'the purchases book shows the bill gross, net, and input VAT'
 );
 select ok(

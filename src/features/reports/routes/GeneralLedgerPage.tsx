@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { GeneralLedgerRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchGeneralLedger(
   clientId: string,
@@ -49,7 +50,7 @@ export function GeneralLedgerPage() {
   const accountId = searchParams.get('account') ?? ''
   const year = new Date().getFullYear()
   const [from, setFrom] = useState(`${year}-01-01`)
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [to, setTo] = useState(localToday())
 
   const accountOptions = useMemo(
     () =>
@@ -60,7 +61,7 @@ export function GeneralLedgerPage() {
   )
   const account = (accounts ?? []).find((a) => a.id === accountId)
 
-  const { data: rows, isPending } = useQuery({
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.generalLedger(client.id, accountId, from, to),
     queryFn: () => fetchGeneralLedger(client.id, accountId, from, to),
     enabled: Boolean(accountId && from && to),
@@ -126,7 +127,9 @@ export function GeneralLedgerPage() {
                 ? 'Choose an account to see its ledger.'
                 : isPending
                   ? 'Computing…'
-                  : 'No activity for this account in this range.'
+                  : isError
+                    ? 'Could not load this report — check the connection and retry.'
+                    : 'No activity for this account in this range.'
             }
             dense
           />

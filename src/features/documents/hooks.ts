@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { keys } from '@/lib/queryKeys'
+import { keys, ledgerReportPrefixes } from '@/lib/queryKeys'
 import type { DocType } from '@/lib/database.types'
 import {
   deleteDocumentDraft,
@@ -27,7 +27,7 @@ export function useDocumentDetail(clientId: string, documentId: string | null) {
   })
 }
 
-export function useOpenItems(clientId: string, docType: 'invoice' | 'bill', asOf: string) {
+export function useOpenItems(clientId: string, docType: string, asOf: string) {
   return useQuery({
     queryKey: keys.openItems(clientId, docType, asOf),
     queryFn: () => fetchOpenItems(clientId, docType, asOf),
@@ -44,6 +44,9 @@ function useInvalidateDocuments(clientId: string) {
     void qc.invalidateQueries({ queryKey: keys.entries(clientId) })
     void qc.invalidateQueries({ queryKey: keys.periods(clientId) })
     void qc.invalidateQueries({ queryKey: keys.dashboard(clientId) })
+    for (const prefix of ledgerReportPrefixes) {
+      void qc.invalidateQueries({ queryKey: [prefix, clientId] })
+    }
   }
 }
 

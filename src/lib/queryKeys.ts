@@ -32,4 +32,35 @@ export const keys = {
   taxCodes: (clientId: string) => ['tax-codes', clientId] as const,
   birBook: (clientId: string, book: string, from: string, to: string) =>
     ['bir-book', clientId, book, from, to] as const,
+  items: (clientId: string) => ['items', clientId] as const,
+  valuation: (clientId: string) => ['valuation', clientId] as const,
+  stockCard: (clientId: string, itemId: string, from: string, to: string) =>
+    ['stock-card', clientId, itemId, from, to] as const,
+  adjustments: (clientId: string) => ['adjustments', clientId] as const,
+  workingPaper: (clientId: string, form: string, from: string, to: string) =>
+    ['working-paper', clientId, form, from, to] as const,
+  whtRegister: (clientId: string, direction: string, from: string, to: string) =>
+    ['wht-register', clientId, direction, from, to] as const,
+  certificates: (clientId: string) => ['certificates', clientId] as const,
+  calendar: (clientId: string, year: number) => ['calendar', clientId, year] as const,
+  bankTxns: (clientId: string) => ['bank-txns', clientId] as const,
+  bankProfiles: (clientId: string) => ['bank-profiles', clientId] as const,
+  bankRules: (clientId: string) => ['bank-rules', clientId] as const,
+  attachments: (clientId: string, refId: string) => ['attachments', clientId, refId] as const,
+  approvals: (clientId: string) => ['approvals', clientId] as const,
+  // Cross-client by design: the RPC itself scopes rows to accessible clients,
+  // and the whole cache clears on any auth change.
+  practice: ['practice'] as const,
 }
+
+// Every report family that reads the posted ledger. Mutations that post,
+// reverse, issue, or void MUST invalidate all of these — a cached "Balanced"
+// trial balance that omits the entry just posted is worse than a refetch.
+export const ledgerReportPrefixes = [
+  'trial-balance',
+  'pnl',
+  'balance-sheet',
+  'cash-flow',
+  'general-ledger',
+  'bir-book',
+] as const

@@ -115,19 +115,22 @@ export function CoaPage() {
           </Card>
         )}
 
-        <AccountDialog
-          open={adding}
-          title="Add an account"
-          error={error}
-          busy={createAccount.isPending}
-          onClose={() => setAdding(false)}
-          onSubmit={(form) =>
-            createAccount.mutate(form, {
-              onSuccess: () => { setAdding(false); setToast(`${form.code} ${form.name} added`) },
-              onError: (err) => setError(messageOf(err, 'Could not add the account.')),
-            })
-          }
-        />
+        {/* Mounted only while open so each opening starts with blank fields. */}
+        {adding && (
+          <AccountDialog
+            open
+            title="Add an account"
+            error={error}
+            busy={createAccount.isPending}
+            onClose={() => setAdding(false)}
+            onSubmit={(form) =>
+              createAccount.mutate(form, {
+                onSuccess: () => { setAdding(false); setToast(`${form.code} ${form.name} added`) },
+                onError: (err) => setError(messageOf(err, 'Could not add the account.')),
+              })
+            }
+          />
+        )}
 
         {editing && (
           <Dialog

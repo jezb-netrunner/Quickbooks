@@ -26,8 +26,24 @@ The browser is untrusted.
       hardcoded rates), automatic VAT (inclusive/exclusive) and EWT/CWT lines
       from the posting engine, cash-settled invoices, BIR books (sales,
       purchases, cash receipts, cash disbursements, general journal)
-- [ ] Phase 6 — return working papers, compliance calendar, 2307s
-- [ ] Phase 7 — bank import, attachments, review workflow, practice dashboard
+- [x] **Phase 5.5** — inventory with FIFO cost layers (valuation always equals
+      the 1200 GL balance), purchases/receipts and expenses as first-class
+      documents, COGS booked at the moment of sale, stock adjustments and
+      stock cards, cash accounts with transfers, navigation regrouped by
+      transaction cycle (Sales / Purchases / Inventory / Cash & banking)
+- [x] **Phase 6** — return working papers assembled from the books (2550Q,
+      2551Q, 0619-E/1601-EQ, 1604-E, 1701/1702 under graduated, 8%, or RCIT
+      with MCIT reference), filing calendar derived from per-client deadline
+      rules with status tracking, 2307 registers (to issue / received) and
+      certificate log — every rate, bracket, and deadline is effective-dated
+      configuration
+- [x] **Phase 7** — bank/e-wallet CSV import with per-bank saved column
+      mappings, fingerprint duplicate detection, and a rules-driven
+      categorization queue posting through the journal engine; attachments in
+      client-scoped RLS-protected storage pinned to documents and entries;
+      staff-prepares → firm-admin-approves review workflow enforced at the
+      posting gate; audit log over the books; cross-client practice dashboard
+      (period status, review and bank queues, overdue AR, next BIR deadline)
 
 ## Local development
 

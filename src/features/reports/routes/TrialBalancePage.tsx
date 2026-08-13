@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { TrialBalanceRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchTrialBalance(clientId: string, from: string, to: string): Promise<TrialBalanceRow[]> {
   const { data, error } = await supabase.rpc('trial_balance', {
@@ -24,9 +25,9 @@ export function TrialBalancePage() {
   const navigate = useNavigate()
   const year = new Date().getFullYear()
   const [from, setFrom] = useState(`${year}-01-01`)
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [to, setTo] = useState(localToday())
 
-  const { data: rows, isPending } = useQuery({
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.trialBalance(client.id, from, to),
     queryFn: () => fetchTrialBalance(client.id, from, to),
     enabled: Boolean(from && to),
@@ -87,7 +88,7 @@ export function TrialBalancePage() {
             columns={columns}
             rowKey={(r) => r.account_id}
             onRowClick={(r) => navigate(`/c/${client.id}/general-ledger?account=${r.account_id}`)}
-            emptyMessage={isPending ? 'Computing…' : 'No posted activity in this range.'}
+            emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : 'No posted activity in this range.'}
             dense
           />
           {withActivity.length > 0 && (

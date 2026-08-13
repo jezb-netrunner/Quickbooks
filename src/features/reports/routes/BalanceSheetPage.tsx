@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { BalanceSheetRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchBalanceSheet(clientId: string, asOf: string): Promise<BalanceSheetRow[]> {
   const { data, error } = await supabase.rpc('balance_sheet', {
@@ -33,11 +34,13 @@ function Section({
   rows,
   totalLabel,
   pending,
+  errored,
 }: {
   title: string
   rows: BalanceSheetRow[]
   totalLabel: string
   pending: boolean
+  errored: boolean
 }) {
   const total = rows.reduce((s, r) => s + Number(r.balance), 0)
   return (
@@ -46,7 +49,7 @@ function Section({
         rows={rows}
         columns={rowColumns}
         rowKey={(r) => r.code}
-        emptyMessage={pending ? 'Computing…' : `No ${title.toLowerCase()} balances.`}
+        emptyMessage={pending ? 'Computing…' : errored ? 'Could not load this report — check the connection and retry.' : `No ${title.toLowerCase()} balances.`}
         dense
       />
       {rows.length > 0 && (
@@ -70,9 +73,9 @@ function Section({
 
 export function BalanceSheetPage() {
   const client = useActiveClient()
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10))
+  const [asOf, setAsOf] = useState(localToday())
 
-  const { data: rows, isPending } = useQuery({
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.balanceSheet(client.id, asOf),
     queryFn: () => fetchBalanceSheet(client.id, asOf),
     enabled: Boolean(asOf),
@@ -115,9 +118,9 @@ export function BalanceSheetPage() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
           <Input label="As of" type="date" fieldSize="sm" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
         </div>
-        <Section title="Assets" rows={assets} totalLabel="Total assets" pending={isPending} />
-        <Section title="Liabilities" rows={liabilities} totalLabel="Total liabilities" pending={isPending} />
-        <Section title="Equity" rows={equity} totalLabel="Total equity" pending={isPending} />
+        <Section title="Assets" rows={assets} totalLabel="Total assets" pending={isPending} errored={isError} />
+        <Section title="Liabilities" rows={liabilities} totalLabel="Total liabilities" pending={isPending} errored={isError} />
+        <Section title="Equity" rows={equity} totalLabel="Total equity" pending={isPending} errored={isError} />
         {(rows ?? []).length > 0 && (
           <Card padding="none">
             <div
