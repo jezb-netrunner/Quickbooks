@@ -32,6 +32,11 @@ export const keys = {
   taxCodes: (clientId: string) => ['tax-codes', clientId] as const,
   birBook: (clientId: string, book: string, from: string, to: string) =>
     ['bir-book', clientId, book, from, to] as const,
+  items: (clientId: string) => ['items', clientId] as const,
+  valuation: (clientId: string) => ['valuation', clientId] as const,
+  stockCard: (clientId: string, itemId: string, from: string, to: string) =>
+    ['stock-card', clientId, itemId, from, to] as const,
+  adjustments: (clientId: string) => ['adjustments', clientId] as const,
 }
 
 // Every report family that reads the posted ledger. Mutations that post,

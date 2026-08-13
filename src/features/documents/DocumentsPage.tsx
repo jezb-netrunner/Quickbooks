@@ -5,7 +5,7 @@ import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { useAccounts } from '@/features/coa/hooks'
 import { useContacts } from '@/features/contacts/hooks'
 import type { DocType, DocumentRow } from '@/lib/database.types'
-import { DOC_TYPES, docLabel } from './docTypes'
+import { DOC_TYPES, docLabel, openItemRef } from './docTypes'
 import { DocumentDialog } from './DocumentDialog'
 import { useDocuments, useOpenItems } from './hooks'
 import { localToday } from '@/lib/dates'
@@ -17,12 +17,12 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
   const { data: contacts } = useContacts(client.id)
   const { data: accounts } = useAccounts(client.id)
   const today = localToday()
-  const showsOpenItems = docType === 'invoice' || docType === 'bill'
-  // Payment pages warm the open-items cache their dialog will need (bills for
-  // money-out, invoices for money-in), not a fixed 'invoice' fallback.
+  const showsOpenItems = docType === 'invoice' || docType === 'bill' || docType === 'purchase'
+  // Payment pages warm the open-items cache their dialog will need
+  // (payables for Payments, receivables for Collections).
   const { data: openItems } = useOpenItems(
     client.id,
-    showsOpenItems ? docType : (config.appliesTo ?? 'invoice'),
+    showsOpenItems ? docType : (config.appliesTo ?? 'receivable'),
     today,
   )
 
@@ -120,7 +120,7 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
               rowKey={(o) => o.document_id}
               dense
               columns={[
-                { key: 'doc', header: 'No.', width: 100, render: (o) => <span style={{ font: '500 13px/1 var(--font-mono)' }}>{`${config.prefix}-${o.doc_no}`}</span> },
+                { key: 'doc', header: 'No.', width: 100, render: (o) => <span style={{ font: '500 13px/1 var(--font-mono)' }}>{openItemRef(o.doc_type, o.doc_no)}</span> },
                 { key: 'contact_name', header: config.contactSide === 'customer' ? 'Customer' : 'Vendor' },
                 { key: 'due_date', header: 'Due', width: 110, render: (o) => <span style={{ font: '400 13px/1 var(--font-mono)' }}>{o.due_date ?? '—'}</span> },
                 { key: 'overdue', header: 'Overdue', width: 90, render: (o) => (o.days_overdue > 0 ? <Badge tone="negative">{o.days_overdue}d</Badge> : <Badge tone="positive">Current</Badge>) },

@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react'
 import { messageOf } from '@/lib/errors'
 import { Amount, Button, Checkbox, Dialog, IconButton, Input, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
-import type { Account, Contact, DocumentRow, OpenItemRow } from '@/lib/database.types'
+import type { Account, Contact, DocumentRow, Item, OpenItemRow } from '@/lib/database.types'
 import { useTaxCodes } from '@/features/tax/hooks'
+import { useItems } from '@/features/inventory/hooks'
 import type { TaxCodeWithRate } from '@/features/tax/api'
-import { docLabel, type DocTypeConfig } from './docTypes'
+import { docLabel, openItemRef, type DocTypeConfig } from './docTypes'
 import { localToday } from '@/lib/dates'
 import {
   useDeleteDocument,
@@ -17,6 +18,8 @@ import {
 } from './hooks'
 
 interface EditableLine {
+  item_id: string
+  qty: string
   account_id: string
   description: string
   amount: string
@@ -63,12 +66,14 @@ export function DocumentDialog(props: {
   // delete a saved draft's applications.
   const { data: openItems } = useOpenItems(
     props.clientId,
-    props.config.appliesTo ?? 'invoice',
+    props.config.appliesTo ?? 'receivable',
     localToday(),
   )
+  const { data: items } = useItems(props.clientId)
   if (
     (props.document && isPending) ||
     taxCodes === undefined ||
+    items === undefined ||
     (props.config.appliesTo !== null && openItems === undefined)
   )
     return null
@@ -76,6 +81,7 @@ export function DocumentDialog(props: {
     <DocumentForm
       {...props}
       taxCodes={taxCodes}
+      items={items}
       openItems={openItems ?? []}
       detail={detail ?? { lines: [], applications: [] }}
     />
@@ -88,6 +94,7 @@ function DocumentForm({
   contacts,
   accounts,
   taxCodes,
+  items,
   openItems,
   document: doc,
   detail,
@@ -99,10 +106,18 @@ function DocumentForm({
   contacts: Contact[]
   accounts: Account[]
   taxCodes: TaxCodeWithRate[]
+  items: Item[]
   openItems: OpenItemRow[]
   document: DocumentRow | null
   detail: {
-    lines: { account_id: string; description: string; amount: string; tax_code_id: string | null }[]
+    lines: {
+      account_id: string
+      description: string
+      amount: string
+      tax_code_id: string | null
+      item_id: string | null
+      qty: string | null
+    }[]
     applications: { target_document_id: string; amount: string }[]
   }
   onClose: () => void
@@ -129,13 +144,15 @@ function DocumentForm({
   const [lines, setLines] = useState<EditableLine[]>(
     detail.lines.length > 0
       ? detail.lines.map((l) => ({
+          item_id: l.item_id ?? '',
+          qty: l.qty != null ? String(Number(l.qty)) : '',
           account_id: l.account_id,
           description: l.description,
           amount: String(l.amount),
           tax_code_id: l.tax_code_id ?? '',
         }))
-      : config.hasLines && config.type !== 'disbursement'
-        ? [{ account_id: '', description: '', amount: '', tax_code_id: '' }]
+      : config.hasLines
+        ? [{ item_id: '', qty: '', account_id: '', description: '', amount: '', tax_code_id: '' }]
         : [],
   )
   const [error, setError] = useState<string | null>(null)
@@ -162,13 +179,15 @@ function DocumentForm({
       accounts.filter(
         (a) =>
           referenced.has(a.id) ||
+          (config.hasItems && a.code === '1200' && !a.archived_at) ||
           (!a.archived_at &&
             config.lineAccountTypes.includes(a.account_type) &&
             a.code !== '1100' &&
             a.code !== '2000' &&
+            a.code !== '1200' &&
             !taxAccountCodes.has(a.code)),
       ),
-    [accounts, config.lineAccountTypes, referenced, taxAccountCodes],
+    [accounts, config.hasItems, config.lineAccountTypes, referenced, taxAccountCodes],
   )
   const lineTaxCodes = useMemo(
     () => taxCodes.filter((t) => t.active && t.kind === config.lineTaxKind),
@@ -183,6 +202,33 @@ function DocumentForm({
     for (const t of taxCodes) m.set(t.id, t.currentRate)
     return m
   }, [taxCodes])
+  const activeItems = useMemo(() => items.filter((i) => !i.archived_at), [items])
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
+  // Purchases post item lines to the 1200 Inventory control account.
+  const inventoryAccount = useMemo(() => accounts.find((a) => a.code === '1200'), [accounts])
+
+  // Picking an item wires the line: account (income for sales, 1200 for
+  // purchases), default amount from qty x default price/cost.
+  function applyItem(i: number, itemId: string, qtyStr: string) {
+    const item = itemId ? itemById.get(itemId) : undefined
+    const qty = Number(qtyStr) || 0
+    const price = config.type === 'invoice' ? item?.sales_price : item?.purchase_cost
+    setLines((prev) =>
+      prev.map((l, idx) => {
+        if (idx !== i) return l
+        const next = { ...l, item_id: itemId, qty: qtyStr }
+        if (item) {
+          next.account_id =
+            config.type === 'purchase'
+              ? (inventoryAccount?.id ?? l.account_id)
+              : (item.income_account_id ?? l.account_id)
+          if (!next.description) next.description = item.name
+          if (qty > 0 && price != null) next.amount = String(round2(qty * Number(price)))
+        }
+        return next
+      }),
+    )
+  }
 
   // Open items of the chosen contact, for payments (fetched by the wrapper
   // before this form mounts — see DocumentDialog).
@@ -198,7 +244,7 @@ function DocumentForm({
       .filter((o) => o.contact_id === contactId)
       .map((o) => ({
         target_document_id: o.document_id,
-        label: `${config.appliesTo === 'invoice' ? 'INV' : 'BILL'}-${o.doc_no} · ${o.doc_date}`,
+        label: `${openItemRef(o.doc_type, o.doc_no)} · ${o.doc_date}`,
         // Draft applications never count toward open_items, so the balance
         // shown is the true headroom even while re-editing this draft.
         open: Number(o.balance),
@@ -218,11 +264,19 @@ function DocumentForm({
   // an amount with no account chosen must not inflate the total or enable
   // issuing a smaller document than the screen shows.
   const completeLines = useMemo(
-    () => lines.filter((l) => l.account_id && Number(l.amount) > 0),
+    () =>
+      lines.filter(
+        (l) => l.account_id && Number(l.amount) > 0 && (!l.item_id || Number(l.qty) > 0),
+      ),
     [lines],
   )
   const lineTotal = completeLines.reduce((s, l) => s + Number(l.amount), 0)
-  const hasIncompleteLine = lines.some((l) => Number(l.amount) > 0 && !l.account_id)
+  const hasIncompleteLine = lines.some(
+    (l) =>
+      (Number(l.amount) > 0 && !l.account_id) ||
+      (l.item_id !== '' && !(Number(l.qty) > 0)) ||
+      (l.item_id !== '' && !(Number(l.amount) > 0)),
+  )
   const appTotal = appRows.reduce((s, a) => s + (Number(a.amount) || 0), 0)
 
   // Live tax preview mirroring the engine's math.
@@ -242,11 +296,9 @@ function DocumentForm({
   const whtAmount = whtCodeId && whtRate && Number(whtBase) > 0 ? round2(Number(whtBase) * whtRate) : 0
   const docGross = taxPreview.net + taxPreview.vat
   const grandTotal =
-    config.type === 'invoice' || config.type === 'bill'
-      ? docGross
-      : appTotal + docGross - whtAmount
+    config.appliesTo === null ? docGross : appTotal + docGross - whtAmount
   const issueGate =
-    (config.type === 'invoice' || config.type === 'bill' ? lineTotal : appTotal + lineTotal) > 0 &&
+    (config.appliesTo === null ? lineTotal : appTotal + lineTotal) > 0 &&
     !hasIncompleteLine &&
     !(config.hasBank && !bankAccountId)
 
@@ -264,12 +316,14 @@ function DocumentForm({
       whtTaxCodeId: config.whtKind && whtCodeId ? whtCodeId : null,
       whtBase: config.whtKind && whtCodeId && Number(whtBase) > 0 ? Number(whtBase) : null,
       lines: lines
-        .filter((l) => l.account_id && Number(l.amount) > 0)
+        .filter((l) => l.account_id && Number(l.amount) > 0 && (!l.item_id || Number(l.qty) > 0))
         .map((l) => ({
           account_id: l.account_id,
           description: l.description.trim(),
           amount: Number(l.amount),
           tax_code_id: l.tax_code_id || null,
+          item_id: l.item_id || null,
+          qty: l.item_id && Number(l.qty) > 0 ? Number(l.qty) : null,
         })),
       applications: appRows
         .filter((a) => Number(a.amount) > 0)
@@ -280,15 +334,20 @@ function DocumentForm({
   const busy = save.isPending || remove.isPending || issue.isPending || voidDoc.isPending
   const title = doc ? `${docLabel(config, doc.doc_no)} · ${doc.status}` : `New ${config.noun}`
   const showTaxColumn = config.lineTaxKind !== null && lineTaxCodes.length > 0
-  const lineGrid = showTaxColumn
-    ? 'minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.7fr) 100px 34px'
-    : 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px'
+  const showItemColumn = config.hasItems && activeItems.length > 0
+  const lineGrid = showItemColumn
+    ? showTaxColumn
+      ? 'minmax(0, 1fr) 64px minmax(0, 1fr) minmax(0, 0.9fr) 100px 34px'
+      : 'minmax(0, 1fr) 64px minmax(0, 1fr) minmax(0, 0.9fr) 110px 34px'
+    : showTaxColumn
+      ? 'minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.7fr) 100px 34px'
+      : 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px'
 
   return (
     <Dialog
       open
       onClose={onClose}
-      width={showTaxColumn ? 720 : 640}
+      width={showItemColumn ? 780 : showTaxColumn ? 720 : 640}
       title={title}
       description={
         isIssued
@@ -396,8 +455,8 @@ function DocumentForm({
             <Select
               label="Settlement"
               options={[
-                { value: 'on_account', label: 'On account — receivable' },
-                { value: 'cash', label: 'Paid now — cash or bank' },
+                { value: 'on_account', label: config.settleOnAccountLabel },
+                { value: 'cash', label: config.settleCashLabel },
               ]}
               value={settleCash ? 'cash' : 'on_account'}
               disabled={isIssued}
@@ -409,7 +468,7 @@ function DocumentForm({
             />
             {settleCash && (
               <Select
-                label="Deposit to"
+                label={config.contactSide === 'customer' ? 'Deposit to' : 'Paid from'}
                 placeholder="Cash or bank account"
                 options={bankAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }))}
                 value={bankAccountId}
@@ -434,7 +493,7 @@ function DocumentForm({
         {config.appliesTo && (
           <div style={{ display: 'grid', gap: 8 }}>
             <span style={{ font: 'var(--type-overline)', letterSpacing: 'var(--tracking-caps)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Apply to open {config.appliesTo === 'invoice' ? 'invoices' : 'bills'}
+              Apply to open {config.appliesTo === 'receivable' ? 'invoices' : 'bills and purchases'}
             </span>
             {!contactId ? (
               <p style={{ font: 'var(--type-body-sm)', color: 'var(--text-muted)' }}>
@@ -520,21 +579,45 @@ function DocumentForm({
             </div>
             {lines.map((line, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: lineGrid, gap: 8, alignItems: 'center' }}>
+                {showItemColumn && (
+                  <>
+                    <Select
+                      aria-label={`Line ${i + 1} item`}
+                      placeholder="No item — service"
+                      options={activeItems.map((it) => ({ value: it.id, label: `${it.sku} ${it.name}` }))}
+                      value={line.item_id}
+                      disabled={isIssued}
+                      onChange={(e) => applyItem(i, e.target.value, line.qty || '1')}
+                    />
+                    <Input
+                      aria-label={`Line ${i + 1} quantity`}
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      placeholder="Qty"
+                      value={line.qty}
+                      disabled={isIssued || !line.item_id}
+                      onChange={(e) => applyItem(i, line.item_id, e.target.value)}
+                    />
+                  </>
+                )}
                 <Select
                   aria-label={`Line ${i + 1} account`}
                   placeholder="Account"
                   options={lineAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }))}
                   value={line.account_id}
-                  disabled={isIssued}
+                  disabled={isIssued || (config.type === 'purchase' && line.item_id !== '')}
                   onChange={(e) => setLine(i, { account_id: e.target.value })}
                 />
-                <Input
-                  aria-label={`Line ${i + 1} description`}
-                  placeholder="Description"
-                  value={line.description}
-                  disabled={isIssued}
-                  onChange={(e) => setLine(i, { description: e.target.value })}
-                />
+                {!showItemColumn && (
+                  <Input
+                    aria-label={`Line ${i + 1} description`}
+                    placeholder="Description"
+                    value={line.description}
+                    disabled={isIssued}
+                    onChange={(e) => setLine(i, { description: e.target.value })}
+                  />
+                )}
                 {showTaxColumn && (
                   <Select
                     aria-label={`Line ${i + 1} tax`}
@@ -555,7 +638,7 @@ function DocumentForm({
                   disabled={isIssued}
                   onChange={(e) => setLine(i, { amount: e.target.value })}
                 />
-                {!isIssued && lines.length > (config.type === 'disbursement' ? 0 : 1) ? (
+                {!isIssued && lines.length > 1 ? (
                   <IconButton icon="x" label={`Remove line ${i + 1}`} size={14} onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} />
                 ) : (
                   <span />
@@ -564,7 +647,7 @@ function DocumentForm({
             ))}
             {!isIssued && (
               <div>
-                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { account_id: '', description: '', amount: '', tax_code_id: '' }])}>
+                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { item_id: '', qty: '', account_id: '', description: '', amount: '', tax_code_id: '' }])}>
                   Add line
                 </Button>
               </div>

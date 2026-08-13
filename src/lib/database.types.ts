@@ -13,7 +13,7 @@ export type NormalBalance = 'debit' | 'credit'
 export type PeriodStatus = 'open' | 'closed' | 'locked'
 export type EntryStatus = 'draft' | 'posted'
 export type ContactType = 'customer' | 'vendor' | 'both'
-export type DocType = 'invoice' | 'bill' | 'receipt' | 'disbursement'
+export type DocType = 'invoice' | 'bill' | 'receipt' | 'disbursement' | 'purchase' | 'expense'
 export type DocStatus = 'draft' | 'issued' | 'voided'
 export type TaxRegime = 'vat' | 'non_vat'
 export type TaxKind = 'output_vat' | 'input_vat' | 'withholding_sales' | 'withholding_purchases'
@@ -339,6 +339,8 @@ export interface Database {
           description: string
           amount: string
           tax_code_id: string | null
+          item_id: string | null
+          qty: string | null
         }
         Insert: {
           document_id: string
@@ -348,6 +350,8 @@ export interface Database {
           description?: string
           amount: number | string
           tax_code_id?: string | null
+          item_id?: string | null
+          qty?: number | string | null
         }
         Update: {
           line_no?: number
@@ -355,7 +359,96 @@ export interface Database {
           description?: string
           amount?: number | string
           tax_code_id?: string | null
+          item_id?: string | null
+          qty?: number | string | null
         }
+        Relationships: []
+      }
+      items: {
+        Row: {
+          id: string
+          client_id: string
+          sku: string
+          name: string
+          uom: string
+          income_account_id: string | null
+          sales_price: string | null
+          purchase_cost: string | null
+          archived_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          sku: string
+          name: string
+          uom?: string
+          income_account_id?: string | null
+          sales_price?: number | string | null
+          purchase_cost?: number | string | null
+        }
+        Update: {
+          sku?: string
+          name?: string
+          uom?: string
+          income_account_id?: string | null
+          sales_price?: number | string | null
+          purchase_cost?: number | string | null
+          archived_at?: string | null
+        }
+        Relationships: []
+      }
+      inventory_layers: {
+        Row: {
+          id: string
+          client_id: string
+          item_id: string
+          acquired_date: string
+          qty_in: string
+          qty_remaining: string
+          unit_cost: string
+          cost_total: string
+          source_document_id: string | null
+          source_adjustment_id: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      layer_consumptions: {
+        Row: {
+          id: string
+          client_id: string
+          layer_id: string
+          document_id: string | null
+          adjustment_id: string | null
+          move_date: string
+          qty: string
+          cost: string
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      stock_adjustments: {
+        Row: {
+          id: string
+          client_id: string
+          item_id: string
+          adj_date: string
+          qty_delta: string
+          unit_cost: string | null
+          account_id: string
+          memo: string
+          entry_id: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
         Relationships: []
       }
       client_tax_profiles: {
@@ -552,6 +645,7 @@ export interface Database {
         Args: { p_client_id: string; p_doc_type: string; p_as_of: string }
         Returns: {
           document_id: string
+          doc_type: string
           doc_no: number
           doc_date: string
           due_date: string | null
@@ -654,7 +748,7 @@ export interface Database {
         Args: { p_client_id: string; p_date_from: string; p_date_to: string }
         Returns: {
           doc_date: string
-          doc_no: number
+          ref: string
           supplier: string
           tin: string
           status: string
@@ -710,6 +804,43 @@ export interface Database {
           credit: string
         }[]
       }
+      post_stock_adjustment: {
+        Args: {
+          p_client_id: string
+          p_item_id: string
+          p_date: string
+          p_qty_delta: number
+          p_unit_cost?: number | null
+          p_account_id?: string | null
+          p_memo?: string
+        }
+        Returns: string
+      }
+      inventory_valuation: {
+        Args: { p_client_id: string }
+        Returns: {
+          item_id: string
+          sku: string
+          name: string
+          uom: string
+          qty_on_hand: string
+          value: string
+          avg_cost: string
+        }[]
+      }
+      stock_card: {
+        Args: { p_client_id: string; p_item_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          move_date: string
+          ref: string
+          memo: string
+          qty_in: string
+          qty_out: string
+          cost: string
+          running_qty: string
+          running_value: string
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -739,6 +870,10 @@ export type GeneralLedgerRow = Database['public']['Functions']['general_ledger']
 export type ClientTaxProfile = Database['public']['Tables']['client_tax_profiles']['Row']
 export type TaxCode = Database['public']['Tables']['tax_codes']['Row']
 export type TaxCodeRate = Database['public']['Tables']['tax_code_rates']['Row']
+export type Item = Database['public']['Tables']['items']['Row']
+export type StockAdjustment = Database['public']['Tables']['stock_adjustments']['Row']
+export type InventoryValuationRow = Database['public']['Functions']['inventory_valuation']['Returns'][number]
+export type StockCardRow = Database['public']['Functions']['stock_card']['Returns'][number]
 export type SalesBookRow = Database['public']['Functions']['sales_book']['Returns'][number]
 export type PurchasesBookRow = Database['public']['Functions']['purchases_book']['Returns'][number]
 export type CashReceiptsBookRow = Database['public']['Functions']['cash_receipts_book']['Returns'][number]

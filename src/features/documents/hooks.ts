@@ -27,7 +27,7 @@ export function useDocumentDetail(clientId: string, documentId: string | null) {
   })
 }
 
-export function useOpenItems(clientId: string, docType: 'invoice' | 'bill', asOf: string) {
+export function useOpenItems(clientId: string, docType: string, asOf: string) {
   return useQuery({
     queryKey: keys.openItems(clientId, docType, asOf),
     queryFn: () => fetchOpenItems(clientId, docType, asOf),

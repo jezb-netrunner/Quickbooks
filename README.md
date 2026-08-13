@@ -26,6 +26,11 @@ The browser is untrusted.
       hardcoded rates), automatic VAT (inclusive/exclusive) and EWT/CWT lines
       from the posting engine, cash-settled invoices, BIR books (sales,
       purchases, cash receipts, cash disbursements, general journal)
+- [x] **Phase 5.5** — inventory with FIFO cost layers (valuation always equals
+      the 1200 GL balance), purchases/receipts and expenses as first-class
+      documents, COGS booked at the moment of sale, stock adjustments and
+      stock cards, cash accounts with transfers, navigation regrouped by
+      transaction cycle (Sales / Purchases / Inventory / Cash & banking)
 - [ ] Phase 6 — return working papers, compliance calendar, 2307s
 - [ ] Phase 7 — bank import, attachments, review workflow, practice dashboard
 

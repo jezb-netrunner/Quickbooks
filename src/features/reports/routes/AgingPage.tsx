@@ -21,7 +21,7 @@ async function fetchAging(clientId: string, docType: string, asOf: string): Prom
 
 export function AgingPage() {
   const client = useActiveClient()
-  const [side, setSide] = useState('invoice')
+  const [side, setSide] = useState('receivable')
   const [asOf, setAsOf] = useState(localToday())
   const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.aging(client.id, side, asOf),
@@ -41,10 +41,10 @@ export function AgingPage() {
     }
   }, [rows])
 
-  const sideLabel = side === 'invoice' ? 'Receivables' : 'Payables'
+  const sideLabel = side === 'receivable' ? 'Receivables' : 'Payables'
 
   const columns: Column<AgingRow>[] = [
-    { key: 'contact_name', header: side === 'invoice' ? 'Customer' : 'Vendor' },
+    { key: 'contact_name', header: side === 'receivable' ? 'Customer' : 'Vendor' },
     { key: 'current_amount', header: 'Current', width: 120, align: 'right', render: (r) => <Amount value={r.current_amount} dashZero /> },
     { key: 'days_1_30', header: '1–30', width: 110, align: 'right', render: (r) => <Amount value={r.days_1_30} dashZero /> },
     { key: 'days_31_60', header: '31–60', width: 110, align: 'right', render: (r) => <Amount value={r.days_31_60} dashZero /> },
@@ -55,10 +55,10 @@ export function AgingPage() {
 
   function report(): ReportExport {
     return {
-      filename: `${side === 'invoice' ? 'ar' : 'ap'}-aging_${client.code ?? client.name}_${asOf}`,
+      filename: `${side === 'receivable' ? 'ar' : 'ap'}-aging_${client.code ?? client.name}_${asOf}`,
       title: `${sideLabel} aging`,
       subtitle: [client.name, `As of ${asOf}`],
-      header: [side === 'invoice' ? 'Customer' : 'Vendor', 'Current', '1-30', '31-60', '61-90', 'Over 90', 'Total'],
+      header: [side === 'receivable' ? 'Customer' : 'Vendor', 'Current', '1-30', '31-60', '61-90', 'Over 90', 'Total'],
       rows: (rows ?? []).map((r) => [
         r.contact_name, r.current_amount, r.days_1_30, r.days_31_60, r.days_61_90, r.days_over_90, r.total,
       ]),
@@ -79,8 +79,8 @@ export function AgingPage() {
             value={side}
             onChange={setSide}
             items={[
-              { value: 'invoice', label: 'Receivables' },
-              { value: 'bill', label: 'Payables' },
+              { value: 'receivable', label: 'Receivables' },
+              { value: 'payable', label: 'Payables (bills + purchases)' },
             ]}
           />
           <Input label="As of" type="date" fieldSize="sm" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
