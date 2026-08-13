@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { messageOf } from '@/lib/errors'
 import { Button, Card, Dialog, Toast } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
+import { TaxProfileCard } from '@/features/tax/TaxProfileCard'
 import { useActiveClient } from './ClientLayout'
 import { ClientForm } from '../ClientForm'
 import { useSetClientArchived, useUpdateClient } from '../hooks'
@@ -35,6 +36,7 @@ export function ClientSettingsPage() {
               }}
             />
           </Card>
+          <TaxProfileCard clientId={client.id} />
           <Card
             title={client.archived_at ? 'Restore this client' : 'Archive this client'}
             subtitle="Archived books are kept, never deleted"

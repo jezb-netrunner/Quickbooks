@@ -1,4 +1,4 @@
-import type { DocType } from '@/lib/database.types'
+import type { DocType, TaxKind } from '@/lib/database.types'
 
 // One config drives all four document screens.
 export interface DocTypeConfig {
@@ -21,6 +21,15 @@ export interface DocTypeConfig {
    * server-side since 20260812001500).
    */
   lineAccountTypes: string[]
+  /** Which tax-code kind may tag this document's lines (null: no tax column). */
+  lineTaxKind: TaxKind | null
+  /** Which withholding kind this payment document accepts (null: none). */
+  whtKind: TaxKind | null
+  /**
+   * Invoices may settle straight to cash at issue (EOPT: the invoice covers
+   * cash and credit sales alike) — shows the settlement selector.
+   */
+  hasSettlement: boolean
 }
 
 export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
@@ -37,6 +46,9 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     appliesTo: null,
     lineHint: 'Income accounts — what was sold',
     lineAccountTypes: ['income'],
+    lineTaxKind: 'output_vat',
+    whtKind: null,
+    hasSettlement: true,
   },
   bill: {
     type: 'bill',
@@ -51,6 +63,9 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     appliesTo: null,
     lineHint: 'Expense or asset accounts — what was bought',
     lineAccountTypes: ['expense', 'asset'],
+    lineTaxKind: 'input_vat',
+    whtKind: null,
+    hasSettlement: false,
   },
   receipt: {
     type: 'receipt',
@@ -65,6 +80,9 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     appliesTo: 'invoice',
     lineHint: '',
     lineAccountTypes: [],
+    lineTaxKind: null,
+    whtKind: 'withholding_sales',
+    hasSettlement: false,
   },
   disbursement: {
     type: 'disbursement',
@@ -79,6 +97,9 @@ export const DOC_TYPES: Record<DocType, DocTypeConfig> = {
     appliesTo: 'bill',
     lineHint: 'Direct expenses paid without a bill (optional)',
     lineAccountTypes: ['expense', 'asset'],
+    lineTaxKind: 'input_vat',
+    whtKind: 'withholding_purchases',
+    hasSettlement: false,
   },
 }
 

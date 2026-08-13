@@ -15,6 +15,9 @@ export type EntryStatus = 'draft' | 'posted'
 export type ContactType = 'customer' | 'vendor' | 'both'
 export type DocType = 'invoice' | 'bill' | 'receipt' | 'disbursement'
 export type DocStatus = 'draft' | 'issued' | 'voided'
+export type TaxRegime = 'vat' | 'non_vat'
+export type TaxKind = 'output_vat' | 'input_vat' | 'withholding_sales' | 'withholding_purchases'
+export type VatClass = 'taxable' | 'zero_rated' | 'exempt'
 
 export interface Database {
   public: {
@@ -287,6 +290,9 @@ export interface Database {
           status: DocStatus
           entry_id: string | null
           voided_at: string | null
+          amounts_include_tax: boolean
+          wht_tax_code_id: string | null
+          wht_base: string | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -299,6 +305,9 @@ export interface Database {
           contact_id: string
           bank_account_id?: string | null
           memo?: string
+          amounts_include_tax?: boolean
+          wht_tax_code_id?: string | null
+          wht_base?: number | string | null
         }
         Update: {
           doc_date?: string
@@ -306,6 +315,9 @@ export interface Database {
           contact_id?: string
           bank_account_id?: string | null
           memo?: string
+          amounts_include_tax?: boolean
+          wht_tax_code_id?: string | null
+          wht_base?: number | string | null
         }
         Relationships: [
           {
@@ -326,6 +338,7 @@ export interface Database {
           account_id: string
           description: string
           amount: string
+          tax_code_id: string | null
         }
         Insert: {
           document_id: string
@@ -334,13 +347,93 @@ export interface Database {
           account_id: string
           description?: string
           amount: number | string
+          tax_code_id?: string | null
         }
         Update: {
           line_no?: number
           account_id?: string
           description?: string
           amount?: number | string
+          tax_code_id?: string | null
         }
+        Relationships: []
+      }
+      client_tax_profiles: {
+        Row: {
+          client_id: string
+          regime: TaxRegime
+          updated_at: string
+        }
+        Insert: { client_id: string; regime: TaxRegime }
+        Update: { regime?: TaxRegime }
+        Relationships: []
+      }
+      tax_codes: {
+        Row: {
+          id: string
+          client_id: string
+          code: string
+          name: string
+          kind: TaxKind
+          vat_class: VatClass | null
+          account_code: string
+          atc: string
+          active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          code: string
+          name: string
+          kind: TaxKind
+          vat_class?: VatClass | null
+          account_code: string
+          atc?: string
+          active?: boolean
+        }
+        Update: {
+          name?: string
+          vat_class?: VatClass | null
+          account_code?: string
+          atc?: string
+          active?: boolean
+        }
+        Relationships: []
+      }
+      tax_code_rates: {
+        Row: {
+          id: string
+          tax_code_id: string
+          client_id: string
+          effective_from: string
+          rate: string
+          created_at: string
+        }
+        Insert: {
+          tax_code_id: string
+          client_id: string
+          effective_from: string
+          rate: number | string
+        }
+        Update: {
+          effective_from?: string
+          rate?: number | string
+        }
+        Relationships: []
+      }
+      document_taxes: {
+        Row: {
+          id: string
+          document_id: string
+          client_id: string
+          tax_code_id: string
+          base: string
+          amount: string
+        }
+        Insert: never
+        Update: never
         Relationships: []
       }
       document_applications: {
@@ -538,6 +631,85 @@ export interface Database {
           running: string
         }[]
       }
+      seed_client_tax_codes: {
+        Args: { p_client_id: string; p_regime: string }
+        Returns: undefined
+      }
+      sales_book: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          doc_date: string
+          doc_no: number
+          customer: string
+          tin: string
+          status: string
+          gross: string
+          exempt: string
+          zero_rated: string
+          taxable: string
+          output_vat: string
+        }[]
+      }
+      purchases_book: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          doc_date: string
+          doc_no: number
+          supplier: string
+          tin: string
+          status: string
+          gross: string
+          exempt: string
+          taxable: string
+          input_vat: string
+        }[]
+      }
+      cash_receipts_book: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          entry_date: string
+          entry_no: number
+          source_type: string
+          memo: string
+          cash: string
+          cwt: string
+          ar_credit: string
+          sales: string
+          output_vat: string
+          sundry_debit: string
+          sundry_credit: string
+        }[]
+      }
+      cash_disbursements_book: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          entry_date: string
+          entry_no: number
+          source_type: string
+          memo: string
+          cash: string
+          ap_debit: string
+          purchases: string
+          input_vat: string
+          ewt: string
+          sundry_debit: string
+          sundry_credit: string
+        }[]
+      }
+      general_journal_book: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          entry_date: string
+          entry_no: number
+          source_type: string
+          memo: string
+          line_no: number
+          code: string
+          account: string
+          debit: string
+          credit: string
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -564,3 +736,11 @@ export type PnlRow = Database['public']['Functions']['profit_and_loss']['Returns
 export type BalanceSheetRow = Database['public']['Functions']['balance_sheet']['Returns'][number]
 export type CashFlowRow = Database['public']['Functions']['cash_flow_indirect']['Returns'][number]
 export type GeneralLedgerRow = Database['public']['Functions']['general_ledger']['Returns'][number]
+export type ClientTaxProfile = Database['public']['Tables']['client_tax_profiles']['Row']
+export type TaxCode = Database['public']['Tables']['tax_codes']['Row']
+export type TaxCodeRate = Database['public']['Tables']['tax_code_rates']['Row']
+export type SalesBookRow = Database['public']['Functions']['sales_book']['Returns'][number]
+export type PurchasesBookRow = Database['public']['Functions']['purchases_book']['Returns'][number]
+export type CashReceiptsBookRow = Database['public']['Functions']['cash_receipts_book']['Returns'][number]
+export type CashDisbursementsBookRow = Database['public']['Functions']['cash_disbursements_book']['Returns'][number]
+export type GeneralJournalBookRow = Database['public']['Functions']['general_journal_book']['Returns'][number]

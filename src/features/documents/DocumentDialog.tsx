@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { messageOf } from '@/lib/errors'
-import { Amount, Button, Dialog, IconButton, Input, Select } from '@/design-system'
+import { Amount, Button, Checkbox, Dialog, IconButton, Input, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
 import type { Account, Contact, DocumentRow } from '@/lib/database.types'
+import { useTaxCodes } from '@/features/tax/hooks'
+import type { TaxCodeWithRate } from '@/features/tax/api'
 import { docLabel, type DocTypeConfig } from './docTypes'
 import {
   useDeleteDocument,
@@ -17,6 +19,7 @@ interface EditableLine {
   account_id: string
   description: string
   amount: string
+  tax_code_id: string
 }
 
 interface EditableApplication {
@@ -24,6 +27,17 @@ interface EditableApplication {
   label: string
   open: number
   amount: string
+}
+
+// Client-side preview of the engine's per-line VAT math (the engine recomputes
+// authoritatively at issue, by document date). Inclusive: net = amount/(1+r).
+function lineTax(amount: number, rate: number | null, inclusive: boolean) {
+  if (!rate || amount <= 0) return { net: amount, tax: 0 }
+  if (inclusive) {
+    const net = Math.round((amount / (1 + rate)) * 100) / 100
+    return { net, tax: Math.round((amount - net) * 100) / 100 }
+  }
+  return { net: amount, tax: Math.round(amount * rate * 100) / 100 }
 }
 
 export function DocumentDialog(props: {
@@ -36,8 +50,15 @@ export function DocumentDialog(props: {
   onDone: (msg: string) => void
 }) {
   const { data: detail, isPending } = useDocumentDetail(props.clientId, props.document?.id ?? null)
-  if (props.document && isPending) return null
-  return <DocumentForm {...props} detail={detail ?? { lines: [], applications: [] }} />
+  const { data: taxCodes } = useTaxCodes(props.clientId)
+  if ((props.document && isPending) || taxCodes === undefined) return null
+  return (
+    <DocumentForm
+      {...props}
+      taxCodes={taxCodes}
+      detail={detail ?? { lines: [], applications: [] }}
+    />
+  )
 }
 
 function DocumentForm({
@@ -45,6 +66,7 @@ function DocumentForm({
   config,
   contacts,
   accounts,
+  taxCodes,
   document: doc,
   detail,
   onClose,
@@ -54,8 +76,12 @@ function DocumentForm({
   config: DocTypeConfig
   contacts: Contact[]
   accounts: Account[]
+  taxCodes: TaxCodeWithRate[]
   document: DocumentRow | null
-  detail: { lines: { account_id: string; description: string; amount: string }[]; applications: { target_document_id: string; amount: string }[] }
+  detail: {
+    lines: { account_id: string; description: string; amount: string; tax_code_id: string | null }[]
+    applications: { target_document_id: string; amount: string }[]
+  }
   onClose: () => void
   onDone: (msg: string) => void
 }) {
@@ -71,11 +97,22 @@ function DocumentForm({
   const [contactId, setContactId] = useState(doc?.contact_id ?? '')
   const [bankAccountId, setBankAccountId] = useState(doc?.bank_account_id ?? '')
   const [memo, setMemo] = useState(doc?.memo ?? '')
+  const [inclusive, setInclusive] = useState(doc?.amounts_include_tax ?? false)
+  const [settleCash, setSettleCash] = useState(
+    config.hasSettlement && doc?.bank_account_id != null,
+  )
+  const [whtCodeId, setWhtCodeId] = useState(doc?.wht_tax_code_id ?? '')
+  const [whtBase, setWhtBase] = useState(doc?.wht_base != null ? String(doc.wht_base) : '')
   const [lines, setLines] = useState<EditableLine[]>(
     detail.lines.length > 0
-      ? detail.lines.map((l) => ({ account_id: l.account_id, description: l.description, amount: String(l.amount) }))
+      ? detail.lines.map((l) => ({
+          account_id: l.account_id,
+          description: l.description,
+          amount: String(l.amount),
+          tax_code_id: l.tax_code_id ?? '',
+        }))
       : config.hasLines && config.type !== 'disbursement'
-        ? [{ account_id: '', description: '', amount: '' }]
+        ? [{ account_id: '', description: '', amount: '', tax_code_id: '' }]
         : [],
   )
   const [error, setError] = useState<string | null>(null)
@@ -91,11 +128,11 @@ function DocumentForm({
     () => accounts.filter((a) => !a.archived_at && a.code.startsWith('1000')),
     [accounts],
   )
+  const taxAccountCodes = useMemo(() => new Set(taxCodes.map((t) => t.account_code)), [taxCodes])
   // Only the account types that make sense for this document's lines, and
-  // never the AR/AP control accounts — the engine posts those sides itself.
-  // A saved draft may still reference an account outside the filter (e.g.
-  // drafted before this rule); keep such accounts listed so the row stays
-  // legible instead of showing an empty select.
+  // never the AR/AP control accounts or tax posting accounts — the engine
+  // posts those sides itself. A saved draft may still reference an account
+  // outside the filter; keep such accounts listed so the row stays legible.
   const referenced = useMemo(() => new Set(detail.lines.map((l) => l.account_id)), [detail.lines])
   const lineAccounts = useMemo(
     () =>
@@ -105,10 +142,24 @@ function DocumentForm({
           (!a.archived_at &&
             config.lineAccountTypes.includes(a.account_type) &&
             a.code !== '1100' &&
-            a.code !== '2000'),
+            a.code !== '2000' &&
+            !taxAccountCodes.has(a.code)),
       ),
-    [accounts, config.lineAccountTypes, referenced],
+    [accounts, config.lineAccountTypes, referenced, taxAccountCodes],
   )
+  const lineTaxCodes = useMemo(
+    () => taxCodes.filter((t) => t.active && t.kind === config.lineTaxKind),
+    [taxCodes, config.lineTaxKind],
+  )
+  const whtCodes = useMemo(
+    () => taxCodes.filter((t) => t.active && t.kind === config.whtKind),
+    [taxCodes, config.whtKind],
+  )
+  const rateOf = useMemo(() => {
+    const m = new Map<string, number | null>()
+    for (const t of taxCodes) m.set(t.id, t.currentRate)
+    return m
+  }, [taxCodes])
 
   // Open items of the chosen contact, for payments
   const { data: openItems } = useOpenItems(clientId, config.appliesTo ?? 'invoice', today)
@@ -142,18 +193,54 @@ function DocumentForm({
 
   const lineTotal = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const appTotal = appRows.reduce((s, a) => s + (Number(a.amount) || 0), 0)
-  const grandTotal = lineTotal + appTotal
+
+  // Live tax preview mirroring the engine's math.
+  const taxPreview = useMemo(() => {
+    let net = 0
+    let vat = 0
+    for (const l of lines) {
+      const amount = Number(l.amount) || 0
+      if (amount <= 0) continue
+      const r = l.tax_code_id ? (rateOf.get(l.tax_code_id) ?? null) : null
+      const t = lineTax(amount, r, inclusive)
+      net += t.net
+      vat += t.tax
+    }
+    return { net: Math.round(net * 100) / 100, vat: Math.round(vat * 100) / 100 }
+  }, [lines, rateOf, inclusive])
+  const whtRate = whtCodeId ? (rateOf.get(whtCodeId) ?? null) : null
+  const whtAmount =
+    whtCodeId && whtRate && Number(whtBase) > 0
+      ? Math.round(Number(whtBase) * whtRate * 100) / 100
+      : 0
+  const docGross = taxPreview.net + taxPreview.vat
+  const grandTotal =
+    config.type === 'invoice' || config.type === 'bill'
+      ? docGross
+      : appTotal + docGross - whtAmount
+  const issueGate = config.type === 'invoice' || config.type === 'bill' ? lineTotal : appTotal + lineTotal
 
   function toDraft() {
     return {
       docDate,
       dueDate: config.hasDueDate && dueDate ? dueDate : null,
       contactId,
-      bankAccountId: config.hasBank && bankAccountId ? bankAccountId : null,
+      bankAccountId:
+        (config.hasBank || (config.hasSettlement && settleCash)) && bankAccountId
+          ? bankAccountId
+          : null,
       memo: memo.trim(),
+      amountsIncludeTax: inclusive,
+      whtTaxCodeId: config.whtKind && whtCodeId ? whtCodeId : null,
+      whtBase: config.whtKind && whtCodeId && Number(whtBase) > 0 ? Number(whtBase) : null,
       lines: lines
         .filter((l) => l.account_id && Number(l.amount) > 0)
-        .map((l) => ({ account_id: l.account_id, description: l.description.trim(), amount: Number(l.amount) })),
+        .map((l) => ({
+          account_id: l.account_id,
+          description: l.description.trim(),
+          amount: Number(l.amount),
+          tax_code_id: l.tax_code_id || null,
+        })),
       applications: appRows
         .filter((a) => Number(a.amount) > 0)
         .map((a) => ({ target_document_id: a.target_document_id, amount: Number(a.amount) })),
@@ -162,12 +249,16 @@ function DocumentForm({
 
   const busy = save.isPending || remove.isPending || issue.isPending || voidDoc.isPending
   const title = doc ? `${docLabel(config, doc.doc_no)} · ${doc.status}` : `New ${config.noun}`
+  const showTaxColumn = config.lineTaxKind !== null && lineTaxCodes.length > 0
+  const lineGrid = showTaxColumn
+    ? 'minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.7fr) 100px 34px'
+    : 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px'
 
   return (
     <Dialog
       open
       onClose={onClose}
-      width={640}
+      width={showTaxColumn ? 720 : 640}
       title={title}
       description={
         isIssued
@@ -233,7 +324,7 @@ function DocumentForm({
             </Button>
             <Button
               variant="accent"
-              disabled={busy || !contactId || grandTotal <= 0}
+              disabled={busy || !contactId || issueGate <= 0 || (config.hasSettlement && settleCash && !bankAccountId)}
               onClick={() =>
                 save.mutate(
                   { documentId: doc?.id ?? null, draft: toDraft() },
@@ -270,6 +361,34 @@ function DocumentForm({
             <Input label="Due" type="date" value={dueDate} disabled={isIssued} onChange={(e) => setDueDate(e.target.value)} />
           )}
         </div>
+        {config.hasSettlement && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
+            <Select
+              label="Settlement"
+              options={[
+                { value: 'on_account', label: 'On account — receivable' },
+                { value: 'cash', label: 'Paid now — cash or bank' },
+              ]}
+              value={settleCash ? 'cash' : 'on_account'}
+              disabled={isIssued}
+              onChange={(e) => {
+                const cash = e.target.value === 'cash'
+                setSettleCash(cash)
+                if (!cash) setBankAccountId('')
+              }}
+            />
+            {settleCash && (
+              <Select
+                label="Deposit to"
+                placeholder="Cash or bank account"
+                options={bankAccounts.map((a) => ({ value: a.id, label: `${a.code} ${a.name}` }))}
+                value={bankAccountId}
+                disabled={isIssued}
+                onChange={(e) => setBankAccountId(e.target.value)}
+              />
+            )}
+          </div>
+        )}
         {config.hasBank && (
           <Select
             label="Cash or bank account"
@@ -318,13 +437,59 @@ function DocumentForm({
           </div>
         )}
 
-        {config.hasLines && (
+        {config.whtKind && whtCodes.length > 0 && (
           <div style={{ display: 'grid', gap: 8 }}>
             <span style={{ font: 'var(--type-overline)', letterSpacing: 'var(--tracking-caps)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              {config.lineHint || 'Lines'}
+              {config.whtKind === 'withholding_sales'
+                ? 'Tax the customer withheld (their 2307)'
+                : 'Tax withheld from the vendor'}
             </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 130px 110px', gap: 8, alignItems: 'end' }}>
+              <Select
+                label="Withholding code"
+                placeholder="None"
+                options={whtCodes.map((t) => ({
+                  value: t.id,
+                  label: `${t.name}${t.currentRate != null ? ` (${(t.currentRate * 100).toFixed(t.currentRate * 100 % 1 === 0 ? 0 : 2)}%)` : ''}`,
+                }))}
+                value={whtCodeId}
+                disabled={isIssued}
+                onChange={(e) => setWhtCodeId(e.target.value)}
+              />
+              <Input
+                label="Base (net of VAT)"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={whtBase}
+                disabled={isIssued || !whtCodeId}
+                onChange={(e) => setWhtBase(e.target.value)}
+              />
+              <div style={{ textAlign: 'right', paddingBottom: 9 }}>
+                <Amount value={whtAmount} muted />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {config.hasLines && (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ font: 'var(--type-overline)', letterSpacing: 'var(--tracking-caps)', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                {config.lineHint || 'Lines'}
+              </span>
+              {showTaxColumn && (
+                <Checkbox
+                  label="Amounts include VAT"
+                  checked={inclusive}
+                  disabled={isIssued}
+                  onChange={(e) => setInclusive(e.target.checked)}
+                />
+              )}
+            </div>
             {lines.map((line, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) 110px 34px', gap: 8, alignItems: 'center' }}>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: lineGrid, gap: 8, alignItems: 'center' }}>
                 <Select
                   aria-label={`Line ${i + 1} account`}
                   placeholder="Account"
@@ -340,6 +505,16 @@ function DocumentForm({
                   disabled={isIssued}
                   onChange={(e) => setLine(i, { description: e.target.value })}
                 />
+                {showTaxColumn && (
+                  <Select
+                    aria-label={`Line ${i + 1} tax`}
+                    placeholder="No tax"
+                    options={lineTaxCodes.map((t) => ({ value: t.id, label: t.code }))}
+                    value={line.tax_code_id}
+                    disabled={isIssued}
+                    onChange={(e) => setLine(i, { tax_code_id: e.target.value })}
+                  />
+                )}
                 <Input
                   aria-label={`Line ${i + 1} amount`}
                   type="number"
@@ -359,7 +534,7 @@ function DocumentForm({
             ))}
             {!isIssued && (
               <div>
-                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { account_id: '', description: '', amount: '' }])}>
+                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { account_id: '', description: '', amount: '', tax_code_id: '' }])}>
                   Add line
                 </Button>
               </div>
@@ -367,9 +542,31 @@ function DocumentForm({
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24, padding: '10px 12px', background: 'var(--sand-100)', borderRadius: 'var(--radius-md)' }}>
-          <span style={{ font: 'var(--type-label)', color: 'var(--text-secondary)' }}>Total</span>
-          <Amount value={grandTotal} />
+        <div style={{ display: 'grid', gap: 6, padding: '10px 12px', background: 'var(--sand-100)', borderRadius: 'var(--radius-md)' }}>
+          {showTaxColumn && taxPreview.vat > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>Net of VAT</span>
+                <Amount value={taxPreview.net} muted />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>VAT</span>
+                <Amount value={taxPreview.vat} muted />
+              </div>
+            </>
+          )}
+          {whtAmount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>Withheld</span>
+              <Amount value={-whtAmount} muted />
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+            <span style={{ font: 'var(--type-label)', color: 'var(--text-secondary)' }}>
+              {config.hasBank || (config.hasSettlement && settleCash) ? 'Cash total' : 'Total'}
+            </span>
+            <Amount value={grandTotal} />
+          </div>
         </div>
       </div>
     </Dialog>

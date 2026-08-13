@@ -21,6 +21,8 @@ import { PnlPage } from './features/reports/routes/PnlPage'
 import { BalanceSheetPage } from './features/reports/routes/BalanceSheetPage'
 import { CashFlowPage } from './features/reports/routes/CashFlowPage'
 import { GeneralLedgerPage } from './features/reports/routes/GeneralLedgerPage'
+import { BirBooksPage } from './features/reports/routes/BirBooksPage'
+import { TaxCodesPage } from './features/tax/TaxCodesPage'
 import { ContactsPage } from './features/contacts/routes/ContactsPage'
 import { DocumentsPage } from './features/documents/DocumentsPage'
 
@@ -59,7 +61,9 @@ export const router = createBrowserRouter(
             { path: 'balance-sheet', element: <BalanceSheetPage /> },
             { path: 'cash-flow', element: <CashFlowPage /> },
             { path: 'general-ledger', element: <GeneralLedgerPage /> },
+            { path: 'bir-books', element: <BirBooksPage /> },
             { path: 'aging', element: <AgingPage /> },
+            { path: 'tax-codes', element: <TaxCodesPage /> },
             { path: 'settings', element: <ClientSettingsPage /> },
           ],
         },

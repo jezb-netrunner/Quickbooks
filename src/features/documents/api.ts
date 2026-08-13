@@ -55,7 +55,10 @@ export interface DraftDocumentInput {
   contactId: string
   bankAccountId: string | null
   memo: string
-  lines: { account_id: string; description: string; amount: number }[]
+  amountsIncludeTax: boolean
+  whtTaxCodeId: string | null
+  whtBase: number | null
+  lines: { account_id: string; description: string; amount: number; tax_code_id: string | null }[]
   applications: { target_document_id: string; amount: number }[]
 }
 
@@ -74,6 +77,9 @@ export async function saveDocumentDraft(
     contact_id: input.contactId,
     bank_account_id: input.bankAccountId,
     memo: input.memo,
+    amounts_include_tax: input.amountsIncludeTax,
+    wht_tax_code_id: input.whtTaxCodeId,
+    wht_base: input.whtBase,
   }
   if (id === null) {
     const { data, error } = await supabase
@@ -103,6 +109,7 @@ export async function saveDocumentDraft(
         account_id: l.account_id,
         description: l.description,
         amount: l.amount,
+        tax_code_id: l.tax_code_id,
       })),
     )
     if (error) throw error

@@ -28,7 +28,14 @@ export function Input({ label, hint, error, iconLeft, fieldSize = 'md', id, clas
       )}
       <div className={controlClasses}>
         {iconLeft && <Icon name={iconLeft} size={15} style={{ color: 'var(--text-muted)' }} />}
-        <input id={inputId} {...rest} />
+        <input
+          id={inputId}
+          // Scrolling over a focused number field silently changes the value —
+          // an accounting app cannot afford accidental amount edits.
+          onWheel={rest.type === 'number' ? (e) => e.currentTarget.blur() : undefined}
+          inputMode={rest.type === 'number' ? 'decimal' : undefined}
+          {...rest}
+        />
       </div>
       {error ? (
         <p className="fis-field__error">{error}</p>
