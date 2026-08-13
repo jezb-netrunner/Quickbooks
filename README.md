@@ -31,7 +31,12 @@ The browser is untrusted.
       documents, COGS booked at the moment of sale, stock adjustments and
       stock cards, cash accounts with transfers, navigation regrouped by
       transaction cycle (Sales / Purchases / Inventory / Cash & banking)
-- [ ] Phase 6 — return working papers, compliance calendar, 2307s
+- [x] **Phase 6** — return working papers assembled from the books (2550Q,
+      2551Q, 0619-E/1601-EQ, 1604-E, 1701/1702 under graduated, 8%, or RCIT
+      with MCIT reference), filing calendar derived from per-client deadline
+      rules with status tracking, 2307 registers (to issue / received) and
+      certificate log — every rate, bracket, and deadline is effective-dated
+      configuration
 - [ ] Phase 7 — bank import, attachments, review workflow, practice dashboard
 
 ## Local development

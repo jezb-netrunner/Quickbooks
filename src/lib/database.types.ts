@@ -16,6 +16,9 @@ export type ContactType = 'customer' | 'vendor' | 'both'
 export type DocType = 'invoice' | 'bill' | 'receipt' | 'disbursement' | 'purchase' | 'expense'
 export type DocStatus = 'draft' | 'issued' | 'voided'
 export type TaxRegime = 'vat' | 'non_vat'
+export type TaxpayerKind = 'individual' | 'corporate'
+export type IncomeTaxOption = 'graduated' | 'eight_percent' | 'rcit'
+export type WhtDirection = 'received' | 'issued'
 export type TaxKind = 'output_vat' | 'input_vat' | 'withholding_sales' | 'withholding_purchases'
 export type VatClass = 'taxable' | 'zero_rated' | 'exempt'
 
@@ -455,10 +458,154 @@ export interface Database {
         Row: {
           client_id: string
           regime: TaxRegime
+          taxpayer_kind: TaxpayerKind
+          income_tax_option: IncomeTaxOption
           updated_at: string
         }
         Insert: { client_id: string; regime: TaxRegime }
-        Update: { regime?: TaxRegime }
+        Update: {
+          regime?: TaxRegime
+          taxpayer_kind?: TaxpayerKind
+          income_tax_option?: IncomeTaxOption
+        }
+        Relationships: []
+      }
+      compliance_settings: {
+        Row: {
+          id: string
+          client_id: string
+          key: string
+          effective_from: string
+          rate: string
+          created_at: string
+        }
+        Insert: { client_id: string; key: string; effective_from: string; rate: number | string }
+        Update: { effective_from?: string; rate?: number | string }
+        Relationships: []
+      }
+      income_tax_brackets: {
+        Row: {
+          id: string
+          client_id: string
+          effective_from: string
+          lower_bound: string
+          base_tax: string
+          marginal_rate: string
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          effective_from: string
+          lower_bound: number | string
+          base_tax: number | string
+          marginal_rate: number | string
+        }
+        Update: {
+          effective_from?: string
+          lower_bound?: number | string
+          base_tax?: number | string
+          marginal_rate?: number | string
+        }
+        Relationships: []
+      }
+      compliance_rules: {
+        Row: {
+          id: string
+          client_id: string
+          form: string
+          label: string
+          frequency: string
+          due_days: number | null
+          due_months_after: number | null
+          due_day: number | null
+          skip_q4: boolean
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          form: string
+          label: string
+          frequency: string
+          due_days?: number | null
+          due_months_after?: number | null
+          due_day?: number | null
+          skip_q4?: boolean
+          active?: boolean
+        }
+        Update: {
+          label?: string
+          frequency?: string
+          due_days?: number | null
+          due_months_after?: number | null
+          due_day?: number | null
+          skip_q4?: boolean
+          active?: boolean
+        }
+        Relationships: []
+      }
+      compliance_filings: {
+        Row: {
+          id: string
+          client_id: string
+          form: string
+          period_start: string
+          period_end: string
+          due_date: string
+          status: string
+          reference: string
+          filed_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      wht_certificates: {
+        Row: {
+          id: string
+          client_id: string
+          direction: WhtDirection
+          contact_id: string
+          cert_no: string
+          cert_date: string
+          period_from: string
+          period_to: string
+          atc: string
+          income_payment: string
+          tax_withheld: string
+          notes: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          direction: WhtDirection
+          contact_id: string
+          cert_no?: string
+          cert_date: string
+          period_from: string
+          period_to: string
+          atc?: string
+          income_payment: number | string
+          tax_withheld: number | string
+          notes?: string
+        }
+        Update: {
+          direction?: WhtDirection
+          contact_id?: string
+          cert_no?: string
+          cert_date?: string
+          period_from?: string
+          period_to?: string
+          atc?: string
+          income_payment?: number | string
+          tax_withheld?: number | string
+          notes?: string
+        }
         Relationships: []
       }
       tax_codes: {
@@ -841,6 +988,74 @@ export interface Database {
           running_value: string
         }[]
       }
+      seed_client_compliance: {
+        Args: { p_client_id: string }
+        Returns: undefined
+      }
+      wp_vat: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: { line_no: number; label: string; amount: string; note: string }[]
+      }
+      wp_percentage_tax: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: { line_no: number; label: string; amount: string; note: string }[]
+      }
+      wp_income_tax: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: { line_no: number; label: string; amount: string; note: string }[]
+      }
+      wp_ewt: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: { atc: string; label: string; base: string; tax: string }[]
+      }
+      ewt_by_vendor: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          contact_id: string
+          contact_name: string
+          tin: string
+          atc: string
+          base: string
+          tax: string
+        }[]
+      }
+      cwt_by_customer: {
+        Args: { p_client_id: string; p_date_from: string; p_date_to: string }
+        Returns: {
+          contact_id: string
+          contact_name: string
+          tin: string
+          atc: string
+          base: string
+          tax: string
+        }[]
+      }
+      compliance_calendar: {
+        Args: { p_client_id: string; p_year: number }
+        Returns: {
+          form: string
+          label: string
+          frequency: string
+          period_start: string
+          period_end: string
+          due_date: string
+          status: string
+          filed_at: string | null
+          reference: string
+        }[]
+      }
+      set_filing_status: {
+        Args: {
+          p_client_id: string
+          p_form: string
+          p_period_start: string
+          p_period_end: string
+          p_due_date: string
+          p_status: string
+          p_reference?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -871,6 +1086,11 @@ export type ClientTaxProfile = Database['public']['Tables']['client_tax_profiles
 export type TaxCode = Database['public']['Tables']['tax_codes']['Row']
 export type TaxCodeRate = Database['public']['Tables']['tax_code_rates']['Row']
 export type Item = Database['public']['Tables']['items']['Row']
+export type WhtCertificate = Database['public']['Tables']['wht_certificates']['Row']
+export type WorkingPaperLine = Database['public']['Functions']['wp_vat']['Returns'][number]
+export type EwtLine = Database['public']['Functions']['wp_ewt']['Returns'][number]
+export type WhtByContactRow = Database['public']['Functions']['ewt_by_vendor']['Returns'][number]
+export type CalendarRow = Database['public']['Functions']['compliance_calendar']['Returns'][number]
 export type StockAdjustment = Database['public']['Tables']['stock_adjustments']['Row']
 export type InventoryValuationRow = Database['public']['Functions']['inventory_valuation']['Returns'][number]
 export type StockCardRow = Database['public']['Functions']['stock_card']['Returns'][number]

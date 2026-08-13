@@ -23,6 +23,9 @@ import { CashFlowPage } from './features/reports/routes/CashFlowPage'
 import { GeneralLedgerPage } from './features/reports/routes/GeneralLedgerPage'
 import { BirBooksPage } from './features/reports/routes/BirBooksPage'
 import { TaxCodesPage } from './features/tax/TaxCodesPage'
+import { WorkingPaperPage } from './features/compliance/WorkingPaperPage'
+import { WithholdingPage } from './features/compliance/WithholdingPage'
+import { FilingCalendarPage } from './features/compliance/FilingCalendarPage'
 import { ContactsPage } from './features/contacts/routes/ContactsPage'
 import { DocumentsPage } from './features/documents/DocumentsPage'
 import { ItemsPage } from './features/inventory/ItemsPage'
@@ -77,6 +80,11 @@ export const router = createBrowserRouter(
             { path: 'cash-flow', element: <CashFlowPage /> },
             { path: 'general-ledger', element: <GeneralLedgerPage /> },
             { path: 'bir-books', element: <BirBooksPage /> },
+            { path: 'vat', element: <WorkingPaperPage form="wp_vat" /> },
+            { path: 'percentage-tax', element: <WorkingPaperPage form="wp_percentage_tax" /> },
+            { path: 'income-tax', element: <WorkingPaperPage form="wp_income_tax" /> },
+            { path: 'withholding', element: <WithholdingPage /> },
+            { path: 'filing-calendar', element: <FilingCalendarPage /> },
             { path: 'aging', element: <AgingPage /> },
             { path: 'tax-codes', element: <TaxCodesPage /> },
             { path: 'settings', element: <ClientSettingsPage /> },
