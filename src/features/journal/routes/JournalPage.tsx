@@ -7,7 +7,18 @@ import { useEntries } from '../hooks'
 import { EntryDialog } from '../EntryDialog'
 import type { JournalEntry } from '@/lib/database.types'
 
-const SOURCE_LABEL = { manual: 'Manual', opening_balance: 'Opening balance', reversal: 'Reversal' } as const
+const SOURCE_LABEL: Record<string, string> = {
+  manual: 'Manual',
+  opening_balance: 'Opening balance',
+  reversal: 'Reversal',
+  invoice: 'Invoice',
+  bill: 'Bill',
+  receipt: 'Collection',
+  disbursement: 'Payment',
+  purchase: 'Purchase',
+  expense: 'Expense',
+  bank_import: 'Bank import',
+}
 
 export function JournalPage() {
   const client = useActiveClient()
@@ -37,7 +48,7 @@ export function JournalPage() {
       render: (e) => <span style={{ font: '400 13px/1 var(--font-mono)' }}>{e.entry_date}</span>,
     },
     { key: 'memo', header: 'Memo', render: (e) => e.memo || '—' },
-    { key: 'source_type', header: 'Source', width: 130, render: (e) => SOURCE_LABEL[e.source_type] },
+    { key: 'source_type', header: 'Source', width: 130, render: (e) => SOURCE_LABEL[e.source_type] ?? e.source_type },
     {
       key: 'status',
       header: 'Status',
@@ -49,6 +60,8 @@ export function JournalPage() {
           ) : (
             <Badge tone="positive" dot>Posted</Badge>
           )
+        ) : e.status === 'submitted' ? (
+          <Badge tone="ink" dot>For review</Badge>
         ) : (
           <Badge tone="warning" dot>Draft</Badge>
         ),
@@ -98,6 +111,7 @@ export function JournalPage() {
             clientId={client.id}
             accounts={accounts ?? []}
             entry={selected}
+            requireApproval={client.require_approval}
             onClose={() => setEditorOpen(false)}
             onDone={setToast}
           />

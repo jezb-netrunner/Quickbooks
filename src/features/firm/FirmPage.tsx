@@ -50,7 +50,11 @@ function FirmConsole({ firmId, firmName, isAdmin }: { firmId: string; firmName: 
   const { data: members } = useMembers(firmId)
   const [toast, setToast] = useState<string | null>(null)
 
-  const nav = [{ to: '/select-client', label: 'All clients', icon: 'arrow-left' }]
+  const nav = [
+    { to: '/select-client', label: 'All clients', icon: 'arrow-left' },
+    { to: '/practice', label: 'Practice dashboard', icon: 'briefcase' },
+    { to: '/firm', label: 'Firm settings', icon: 'settings' },
+  ]
 
   return (
     <AppShell sidebar={<Sidebar items={nav} />}>

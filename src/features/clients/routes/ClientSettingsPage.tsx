@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { messageOf } from '@/lib/errors'
-import { Button, Card, Dialog, Toast } from '@/design-system'
+import { Button, Card, Checkbox, Dialog, Toast } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
 import { TaxProfileCard } from '@/features/tax/TaxProfileCard'
 import { useActiveClient } from './ClientLayout'
 import { ClientForm } from '../ClientForm'
-import { useSetClientArchived, useUpdateClient } from '../hooks'
+import { useSetClientArchived, useSetRequireApproval, useUpdateClient } from '../hooks'
 
 export function ClientSettingsPage() {
   const client = useActiveClient()
   const updateClient = useUpdateClient(client.id)
   const setArchived = useSetClientArchived(client.id)
+  const setApproval = useSetRequireApproval(client.id)
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +38,30 @@ export function ClientSettingsPage() {
             />
           </Card>
           <TaxProfileCard clientId={client.id} />
+          <Card
+            title="Review workflow"
+            subtitle="Staff prepare, a firm admin approves — enforced by the posting engine itself"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Checkbox
+                label="Require approval before anything posts"
+                checked={client.require_approval}
+                disabled={setApproval.isPending}
+                onChange={(e) => {
+                  setError(null)
+                  setApproval.mutate(e.target.checked, {
+                    onError: (err) =>
+                      setError(messageOf(err, 'Only a firm admin can change the review setting.')),
+                  })
+                }}
+              />
+              <p style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>
+                {client.require_approval
+                  ? 'On: journal entries, documents, and bank lines from staff wait in Approvals until a firm admin posts them.'
+                  : 'Off: anyone with write access posts directly. Turn this on once more than one person keeps these books.'}
+              </p>
+            </div>
+          </Card>
           <Card
             title={client.archived_at ? 'Restore this client' : 'Archive this client'}
             subtitle="Archived books are kept, never deleted"

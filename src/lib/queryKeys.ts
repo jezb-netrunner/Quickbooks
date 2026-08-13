@@ -43,6 +43,14 @@ export const keys = {
     ['wht-register', clientId, direction, from, to] as const,
   certificates: (clientId: string) => ['certificates', clientId] as const,
   calendar: (clientId: string, year: number) => ['calendar', clientId, year] as const,
+  bankTxns: (clientId: string) => ['bank-txns', clientId] as const,
+  bankProfiles: (clientId: string) => ['bank-profiles', clientId] as const,
+  bankRules: (clientId: string) => ['bank-rules', clientId] as const,
+  attachments: (clientId: string, refId: string) => ['attachments', clientId, refId] as const,
+  approvals: (clientId: string) => ['approvals', clientId] as const,
+  // Cross-client by design: the RPC itself scopes rows to accessible clients,
+  // and the whole cache clears on any auth change.
+  practice: ['practice'] as const,
 }
 
 // Every report family that reads the posted ledger. Mutations that post,

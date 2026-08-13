@@ -32,6 +32,9 @@ import { ItemsPage } from './features/inventory/ItemsPage'
 import { AdjustmentsPage } from './features/inventory/AdjustmentsPage'
 import { ValuationPage } from './features/inventory/ValuationPage'
 import { CashAccountsPage } from './features/cash/CashAccountsPage'
+import { BankImportPage } from './features/banking/BankImportPage'
+import { ApprovalsPage } from './features/review/ApprovalsPage'
+import { PracticeDashboardPage } from './features/practice/PracticeDashboardPage'
 
 // The active client is always the /c/:clientId URL segment — never only local
 // state. Phase 2+ screens (coa, journal, periods, …) slot in as siblings of
@@ -50,6 +53,7 @@ export const router = createBrowserRouter(
         { path: '/select-client', element: <SelectClientPage /> },
         { path: '/create-firm', element: <CreateFirmPage /> },
         { path: '/firm', element: <FirmPage /> },
+        { path: '/practice', element: <PracticeDashboardPage /> },
         {
           path: '/c/:clientId',
           element: <ClientLayout />,
@@ -67,6 +71,8 @@ export const router = createBrowserRouter(
             { path: 'stock-adjustments', element: <AdjustmentsPage /> },
             { path: 'valuation', element: <ValuationPage /> },
             { path: 'cash', element: <CashAccountsPage /> },
+            { path: 'bank-import', element: <BankImportPage /> },
+            { path: 'approvals', element: <ApprovalsPage /> },
             // Old paths keep working: bookmarks predate the cycle regrouping.
             { path: 'contacts', element: <Navigate to="../customers" replace /> },
             { path: 'money-in', element: <Navigate to="../collections" replace /> },

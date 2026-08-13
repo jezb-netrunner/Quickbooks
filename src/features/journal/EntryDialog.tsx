@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react'
 import { messageOf } from '@/lib/errors'
 import { Amount, Button, Dialog, IconButton, Input, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
+import { AttachmentsSection } from '@/features/attachments/AttachmentsSection'
+import { useIsFirmAdmin } from '@/features/clients/hooks'
+import { useSubmitEntry } from '@/features/review/hooks'
 import { useEntryLines, useDeleteDraft, usePostEntry, useReverseEntry, useSaveDraft } from './hooks'
 import type { Account, JournalEntry } from '@/lib/database.types'
 import { localToday } from '@/lib/dates'
@@ -20,6 +23,7 @@ export function EntryDialog(props: {
   clientId: string
   accounts: Account[]
   entry: JournalEntry | null
+  requireApproval: boolean
   onClose: () => void
   onDone: (msg: string) => void
 }) {
@@ -40,6 +44,7 @@ function EntryForm({
   clientId,
   accounts,
   entry, // null = new draft
+  requireApproval,
   initialLines,
   onClose,
   onDone,
@@ -47,15 +52,23 @@ function EntryForm({
   clientId: string
   accounts: Account[]
   entry: JournalEntry | null
+  requireApproval: boolean
   initialLines: EditableLine[]
   onClose: () => void
   onDone: (msg: string) => void
 }) {
   const isPosted = entry?.status === 'posted'
+  const isSubmitted = entry?.status === 'submitted'
+  const locked = isPosted || isSubmitted
+  const isAdmin = useIsFirmAdmin()
+  // Under the approval regime staff prepare and submit; the posting gate in
+  // the database is the enforcement — this only offers the right button.
+  const mustSubmit = requireApproval && !isAdmin
   const saveDraft = useSaveDraft(clientId)
   const deleteDraft = useDeleteDraft(clientId)
   const postEntry = usePostEntry(clientId)
   const reverseEntry = useReverseEntry(clientId)
+  const submitEntry = useSubmitEntry(clientId)
 
   const [entryDate, setEntryDate] = useState(entry?.entry_date ?? localToday())
   const [memo, setMemo] = useState(entry?.memo ?? '')
@@ -89,12 +102,15 @@ function EntryForm({
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
   }
 
-  const busy = saveDraft.isPending || postEntry.isPending || deleteDraft.isPending || reverseEntry.isPending
+  const busy =
+    saveDraft.isPending || postEntry.isPending || deleteDraft.isPending || reverseEntry.isPending || submitEntry.isPending
 
   const title = entry
     ? entry.status === 'posted'
       ? `JE-${entry.entry_no} · posted`
-      : 'Edit draft entry'
+      : entry.status === 'submitted'
+        ? 'Submitted for review'
+        : 'Edit draft entry'
     : 'New journal entry'
 
   return (
@@ -106,10 +122,18 @@ function EntryForm({
       description={
         isPosted
           ? 'Posted entries are immutable. Corrections go through a reversing entry.'
-          : 'Drafts are editable; posting locks the entry and assigns its number.'
+          : isSubmitted
+            ? 'Locked while under review — a firm admin approves or returns it from the Approvals page.'
+            : mustSubmit
+              ? 'Drafts are editable; this client requires review, so submitting sends the entry to a firm admin.'
+              : 'Drafts are editable; posting locks the entry and assigns its number.'
       }
       footer={
-        isPosted ? (
+        isSubmitted ? (
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        ) : isPosted ? (
           <>
             {entry?.reversed_by === null && entry.source_type !== 'reversal' && (
               <Button
@@ -173,16 +197,21 @@ function EntryForm({
                   { entryId: entry?.id ?? null, draft: toDraftInput() },
                   {
                     onSuccess: (id) =>
-                      postEntry.mutate(id, {
-                        onSuccess: (no) => { onDone(`Posted as JE-${no}`); onClose() },
-                        onError: (err) => setError(messageOf(err, 'Could not post the entry.')),
-                      }),
+                      mustSubmit
+                        ? submitEntry.mutate(id, {
+                            onSuccess: () => { onDone('Submitted for review'); onClose() },
+                            onError: (err) => setError(messageOf(err, 'Could not submit the entry.')),
+                          })
+                        : postEntry.mutate(id, {
+                            onSuccess: (no) => { onDone(`Posted as JE-${no}`); onClose() },
+                            onError: (err) => setError(messageOf(err, 'Could not post the entry.')),
+                          }),
                     onError: (err) => setError(messageOf(err, 'Could not save the draft.')),
                   },
                 )
               }
             >
-              {busy ? 'Working' : 'Save and post'}
+              {busy ? 'Working' : mustSubmit ? 'Save and submit' : 'Save and post'}
             </Button>
           </>
         )
@@ -190,19 +219,26 @@ function EntryForm({
     >
       <div style={{ display: 'grid', gap: 14 }}>
         <FormError message={error} />
+        {entry?.status === 'draft' && entry.review_note !== '' && (
+          <div style={{ padding: '10px 12px', background: 'var(--sand-100)', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ font: 'var(--type-body-sm)', color: 'var(--clay-600)' }}>
+              Returned for changes: {entry.review_note}
+            </p>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(0, 1fr)', gap: 12 }}>
           <Input
             label="Date"
             type="date"
             value={entryDate}
-            disabled={isPosted}
+            disabled={locked}
             onChange={(e) => setEntryDate(e.target.value)}
           />
           <Input
             label="Memo"
             placeholder="What is this entry for?"
             value={memo}
-            disabled={isPosted}
+            disabled={locked}
             onChange={(e) => setMemo(e.target.value)}
           />
         </div>
@@ -227,7 +263,7 @@ function EntryForm({
           </div>
           {lines.map((line, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px 110px 34px', gap: 8, alignItems: 'center' }}>
-              {isPosted ? (
+              {locked ? (
                 <span style={{ font: '400 13px/1.3 var(--font-sans)' }}>
                   {accountName.get(line.account_id) ?? '—'}
                 </span>
@@ -247,7 +283,7 @@ function EntryForm({
                 step="0.01"
                 style={{ textAlign: 'right' }}
                 value={line.debit}
-                disabled={isPosted}
+                disabled={locked}
                 onChange={(e) => setLine(i, { debit: e.target.value, credit: e.target.value ? '' : line.credit })}
               />
               <Input
@@ -257,10 +293,10 @@ function EntryForm({
                 step="0.01"
                 style={{ textAlign: 'right' }}
                 value={line.credit}
-                disabled={isPosted}
+                disabled={locked}
                 onChange={(e) => setLine(i, { credit: e.target.value, debit: e.target.value ? '' : line.debit })}
               />
-              {!isPosted && lines.length > 2 ? (
+              {!locked && lines.length > 2 ? (
                 <IconButton
                   icon="x"
                   label={`Remove line ${i + 1}`}
@@ -272,7 +308,7 @@ function EntryForm({
               )}
             </div>
           ))}
-          {!isPosted && (
+          {!locked && (
             <div>
               <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { ...EMPTY }])}>
                 Add line
@@ -299,6 +335,10 @@ function EntryForm({
           <Amount value={totals.debit} />
           <Amount value={totals.credit} />
         </div>
+
+        {entry && (
+          <AttachmentsSection clientId={clientId} target={{ entryId: entry.id }} canWrite={!isSubmitted} />
+        )}
       </div>
     </Dialog>
   )

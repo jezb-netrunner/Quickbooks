@@ -58,6 +58,19 @@ export async function updateClient(clientId: string, form: Partial<ClientForm>):
   return data
 }
 
+export async function setRequireApproval(clientId: string, on: boolean): Promise<Client> {
+  // Column-level grant + RLS restrict this to firm admins; the flag gates the
+  // posting engine itself (post_entry), not just the buttons.
+  const { data, error } = await supabase
+    .from('clients')
+    .update({ require_approval: on })
+    .eq('id', clientId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function setClientArchived(clientId: string, archived: boolean): Promise<Client> {
   const { data, error } = await supabase
     .from('clients')

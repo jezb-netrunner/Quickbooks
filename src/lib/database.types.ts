@@ -11,10 +11,22 @@ export type ReportingBasis = 'accrual' | 'cash'
 export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense'
 export type NormalBalance = 'debit' | 'credit'
 export type PeriodStatus = 'open' | 'closed' | 'locked'
-export type EntryStatus = 'draft' | 'posted'
+export type EntryStatus = 'draft' | 'submitted' | 'posted'
 export type ContactType = 'customer' | 'vendor' | 'both'
 export type DocType = 'invoice' | 'bill' | 'receipt' | 'disbursement' | 'purchase' | 'expense'
-export type DocStatus = 'draft' | 'issued' | 'voided'
+export type DocStatus = 'draft' | 'submitted' | 'issued' | 'voided'
+export type EntrySource =
+  | 'manual'
+  | 'opening_balance'
+  | 'reversal'
+  | 'invoice'
+  | 'bill'
+  | 'receipt'
+  | 'disbursement'
+  | 'purchase'
+  | 'expense'
+  | 'bank_import'
+export type BankTxnStatus = 'pending' | 'categorized' | 'excluded'
 export type TaxRegime = 'vat' | 'non_vat'
 export type TaxpayerKind = 'individual' | 'corporate'
 export type IncomeTaxOption = 'graduated' | 'eight_percent' | 'rcit'
@@ -59,6 +71,7 @@ export interface Database {
           reporting_basis: ReportingBasis
           fiscal_year_end_month: number
           functional_currency: string
+          require_approval: boolean
           archived_at: string | null
           created_by: string
           created_at: string
@@ -78,6 +91,7 @@ export interface Database {
           tin?: string | null
           reporting_basis?: ReportingBasis
           fiscal_year_end_month?: number
+          require_approval?: boolean
           archived_at?: string | null
         }
         Relationships: [
@@ -236,8 +250,10 @@ export interface Database {
           entry_date: string
           period_id: string | null
           status: EntryStatus
-          source_type: 'manual' | 'opening_balance' | 'reversal'
+          source_type: EntrySource
           memo: string
+          review_note: string
+          submitted_by: string | null
           reversal_of: string | null
           reversed_by: string | null
           created_by: string | null
@@ -291,6 +307,8 @@ export interface Database {
           bank_account_id: string | null
           memo: string
           status: DocStatus
+          review_note: string
+          submitted_by: string | null
           entry_id: string | null
           voided_at: string | null
           amounts_include_tax: boolean
@@ -693,6 +711,121 @@ export interface Database {
         Update: { amount?: number | string }
         Relationships: []
       }
+      bank_import_profiles: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          bank_account_id: string
+          date_col: number
+          desc_col: number
+          amount_col: number | null
+          debit_col: number | null
+          credit_col: number | null
+          date_format: 'YMD' | 'DMY' | 'MDY'
+          skip_rows: number
+          negate: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          name: string
+          bank_account_id: string
+          date_col?: number
+          desc_col?: number
+          amount_col?: number | null
+          debit_col?: number | null
+          credit_col?: number | null
+          date_format?: 'YMD' | 'DMY' | 'MDY'
+          skip_rows?: number
+          negate?: boolean
+        }
+        Update: {
+          name?: string
+          bank_account_id?: string
+          date_col?: number
+          desc_col?: number
+          amount_col?: number | null
+          debit_col?: number | null
+          credit_col?: number | null
+          date_format?: 'YMD' | 'DMY' | 'MDY'
+          skip_rows?: number
+          negate?: boolean
+        }
+        Relationships: []
+      }
+      bank_txns: {
+        Row: {
+          id: string
+          client_id: string
+          bank_account_id: string
+          txn_date: string
+          description: string
+          amount: string
+          fingerprint: string
+          status: BankTxnStatus
+          account_id: string | null
+          entry_id: string | null
+          note: string
+          imported_by: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      bank_rules: {
+        Row: {
+          id: string
+          client_id: string
+          match_text: string
+          account_id: string
+          priority: number
+          active: boolean
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          match_text: string
+          account_id: string
+          priority?: number
+          active?: boolean
+        }
+        Update: {
+          match_text?: string
+          account_id?: string
+          priority?: number
+          active?: boolean
+        }
+        Relationships: []
+      }
+      attachments: {
+        Row: {
+          id: string
+          client_id: string
+          document_id: string | null
+          entry_id: string | null
+          storage_path: string
+          filename: string
+          mime: string
+          size_bytes: number
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          client_id: string
+          document_id?: string | null
+          entry_id?: string | null
+          storage_path: string
+          filename: string
+          mime?: string
+          size_bytes?: number
+        }
+        Update: never
+        Relationships: []
+      }
       journal_lines: {
         Row: {
           id: string
@@ -1056,6 +1189,58 @@ export interface Database {
         }
         Returns: undefined
       }
+      submit_entry: {
+        Args: { p_entry_id: string }
+        Returns: undefined
+      }
+      return_entry: {
+        Args: { p_entry_id: string; p_note?: string }
+        Returns: undefined
+      }
+      submit_document: {
+        Args: { p_document_id: string }
+        Returns: undefined
+      }
+      return_document: {
+        Args: { p_document_id: string; p_note?: string }
+        Returns: undefined
+      }
+      import_bank_txns: {
+        Args: { p_client_id: string; p_bank_account_id: string; p_rows: Json }
+        Returns: { inserted: number; duplicates: number; skipped: number }[]
+      }
+      categorize_bank_txn: {
+        Args: { p_txn_id: string; p_account_id: string; p_memo?: string | null }
+        Returns: undefined
+      }
+      exclude_bank_txn: {
+        Args: { p_txn_id: string; p_note?: string }
+        Returns: undefined
+      }
+      restore_bank_txn: {
+        Args: { p_txn_id: string }
+        Returns: undefined
+      }
+      apply_bank_rules: {
+        Args: { p_client_id: string }
+        Returns: number
+      }
+      practice_dashboard: {
+        Args: Record<string, never>
+        Returns: {
+          client_id: string
+          name: string
+          code: string | null
+          period_status: string
+          drafts: number
+          submitted: number
+          pending_bank: number
+          ar_overdue: string
+          overdue_filings: number
+          next_due_form: string | null
+          next_due_date: string | null
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -1099,3 +1284,8 @@ export type PurchasesBookRow = Database['public']['Functions']['purchases_book']
 export type CashReceiptsBookRow = Database['public']['Functions']['cash_receipts_book']['Returns'][number]
 export type CashDisbursementsBookRow = Database['public']['Functions']['cash_disbursements_book']['Returns'][number]
 export type GeneralJournalBookRow = Database['public']['Functions']['general_journal_book']['Returns'][number]
+export type BankImportProfile = Database['public']['Tables']['bank_import_profiles']['Row']
+export type BankTxn = Database['public']['Tables']['bank_txns']['Row']
+export type BankRule = Database['public']['Tables']['bank_rules']['Row']
+export type Attachment = Database['public']['Tables']['attachments']['Row']
+export type PracticeDashboardRow = Database['public']['Functions']['practice_dashboard']['Returns'][number]

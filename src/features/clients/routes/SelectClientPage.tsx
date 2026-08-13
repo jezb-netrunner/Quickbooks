@@ -31,6 +31,11 @@ export function SelectClientPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            {active.length > 0 && (
+              <Button variant="secondary" size="sm" iconLeft="briefcase" onClick={() => navigate('/practice')}>
+                Practice dashboard
+              </Button>
+            )}
             {isAdmin && (
               <Button variant="secondary" size="sm" iconLeft="settings" onClick={() => navigate('/firm')}>
                 Firm settings

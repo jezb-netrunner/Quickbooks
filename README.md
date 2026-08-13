@@ -37,7 +37,13 @@ The browser is untrusted.
       rules with status tracking, 2307 registers (to issue / received) and
       certificate log — every rate, bracket, and deadline is effective-dated
       configuration
-- [ ] Phase 7 — bank import, attachments, review workflow, practice dashboard
+- [x] **Phase 7** — bank/e-wallet CSV import with per-bank saved column
+      mappings, fingerprint duplicate detection, and a rules-driven
+      categorization queue posting through the journal engine; attachments in
+      client-scoped RLS-protected storage pinned to documents and entries;
+      staff-prepares → firm-admin-approves review workflow enforced at the
+      posting gate; audit log over the books; cross-client practice dashboard
+      (period status, review and bank queues, overdue AR, next BIR deadline)
 
 ## Local development
 

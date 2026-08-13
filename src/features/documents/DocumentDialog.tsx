@@ -3,6 +3,9 @@ import { messageOf } from '@/lib/errors'
 import { Amount, Button, Checkbox, Dialog, IconButton, Input, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
 import type { Account, Contact, DocumentRow, Item, OpenItemRow } from '@/lib/database.types'
+import { AttachmentsSection } from '@/features/attachments/AttachmentsSection'
+import { useIsFirmAdmin } from '@/features/clients/hooks'
+import { useSubmitDocument } from '@/features/review/hooks'
 import { useTaxCodes } from '@/features/tax/hooks'
 import { useItems } from '@/features/inventory/hooks'
 import type { TaxCodeWithRate } from '@/features/tax/api'
@@ -56,6 +59,7 @@ export function DocumentDialog(props: {
   contacts: Contact[]
   accounts: Account[]
   document: DocumentRow | null
+  requireApproval: boolean
   onClose: () => void
   onDone: (msg: string) => void
 }) {
@@ -97,6 +101,7 @@ function DocumentForm({
   items,
   openItems,
   document: doc,
+  requireApproval,
   detail,
   onClose,
   onDone,
@@ -109,6 +114,7 @@ function DocumentForm({
   items: Item[]
   openItems: OpenItemRow[]
   document: DocumentRow | null
+  requireApproval: boolean
   detail: {
     lines: {
       account_id: string
@@ -124,10 +130,16 @@ function DocumentForm({
   onDone: (msg: string) => void
 }) {
   const isIssued = doc !== null && doc.status !== 'draft'
+  const isSubmitted = doc?.status === 'submitted'
+  const isAdmin = useIsFirmAdmin()
+  // Same shape as the journal: the database gate is the enforcement, this
+  // only swaps the primary action for preparers under the approval regime.
+  const mustSubmit = requireApproval && !isAdmin
   const save = useSaveDocument(clientId, config.type)
   const remove = useDeleteDocument(clientId)
   const issue = useIssueDocument(clientId)
   const voidDoc = useVoidDocument(clientId)
+  const submitDoc = useSubmitDocument(clientId)
 
   const today = localToday()
   const [docDate, setDocDate] = useState(doc?.doc_date ?? today)
@@ -331,7 +343,7 @@ function DocumentForm({
     }
   }
 
-  const busy = save.isPending || remove.isPending || issue.isPending || voidDoc.isPending
+  const busy = save.isPending || remove.isPending || issue.isPending || voidDoc.isPending || submitDoc.isPending
   const title = doc ? `${docLabel(config, doc.doc_no)} · ${doc.status}` : `New ${config.noun}`
   const showTaxColumn = config.lineTaxKind !== null && lineTaxCodes.length > 0
   const showItemColumn = config.hasItems && activeItems.length > 0
@@ -350,9 +362,13 @@ function DocumentForm({
       width={showItemColumn ? 780 : showTaxColumn ? 720 : 640}
       title={title}
       description={
-        isIssued
-          ? 'Issued documents are immutable. Corrections go through void, which posts a reversing entry.'
-          : 'Drafts are editable; issuing posts the journal entry and assigns the number.'
+        isSubmitted
+          ? 'Locked while under review — a firm admin approves or returns it from the Approvals page.'
+          : isIssued
+            ? 'Issued documents are immutable. Corrections go through void, which posts a reversing entry.'
+            : mustSubmit
+              ? 'Drafts are editable; this client requires review, so submitting sends the document to a firm admin.'
+              : 'Drafts are editable; issuing posts the journal entry and assigns the number.'
       }
       footer={
         isIssued ? (
@@ -419,16 +435,21 @@ function DocumentForm({
                   { documentId: doc?.id ?? null, draft: toDraft() },
                   {
                     onSuccess: (id) =>
-                      issue.mutate(id, {
-                        onSuccess: (no) => { onDone(`Issued as ${config.prefix}-${no}`); onClose() },
-                        onError: (err) => setError(messageOf(err, 'Could not issue the document.')),
-                      }),
+                      mustSubmit
+                        ? submitDoc.mutate(id, {
+                            onSuccess: () => { onDone('Submitted for review'); onClose() },
+                            onError: (err) => setError(messageOf(err, 'Could not submit the document.')),
+                          })
+                        : issue.mutate(id, {
+                            onSuccess: (no) => { onDone(`Issued as ${config.prefix}-${no}`); onClose() },
+                            onError: (err) => setError(messageOf(err, 'Could not issue the document.')),
+                          }),
                     onError: (err) => setError(messageOf(err, 'Could not save the draft.')),
                   },
                 )
               }
             >
-              {busy ? 'Working' : 'Save and issue'}
+              {busy ? 'Working' : mustSubmit ? 'Save and submit' : 'Save and issue'}
             </Button>
           </>
         )
@@ -436,6 +457,13 @@ function DocumentForm({
     >
       <div style={{ display: 'grid', gap: 14 }}>
         <FormError message={error} />
+        {doc?.status === 'draft' && doc.review_note !== '' && (
+          <div style={{ padding: '10px 12px', background: 'var(--sand-100)', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ font: 'var(--type-body-sm)', color: 'var(--clay-600)' }}>
+              Returned for changes: {doc.review_note}
+            </p>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: config.hasDueDate ? 'minmax(0, 1fr) 140px 140px' : 'minmax(0, 1fr) 170px', gap: 12 }}>
           <Select
             label={config.contactSide === 'customer' ? 'Customer' : 'Vendor'}
@@ -681,6 +709,10 @@ function DocumentForm({
             <Amount value={grandTotal} />
           </div>
         </div>
+
+        {doc && (
+          <AttachmentsSection clientId={clientId} target={{ documentId: doc.id }} canWrite={!isSubmitted} />
+        )}
       </div>
     </Dialog>
   )

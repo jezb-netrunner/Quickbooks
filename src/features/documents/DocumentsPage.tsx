@@ -68,6 +68,8 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
           <Badge tone="positive" dot>Issued</Badge>
         ) : d.status === 'voided' ? (
           <Badge tone="neutral" dot>Voided</Badge>
+        ) : d.status === 'submitted' ? (
+          <Badge tone="ink" dot>For review</Badge>
         ) : (
           <Badge tone="warning" dot>Draft</Badge>
         ),
@@ -137,6 +139,7 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
             contacts={contacts ?? []}
             accounts={accounts ?? []}
             document={selected}
+            requireApproval={client.require_approval}
             onClose={() => setDialogOpen(false)}
             onDone={setToast}
           />
