@@ -54,9 +54,11 @@ export function ClientLayout() {
     { to: `/c/${client.id}/balance-sheet`, label: 'Balance sheet', icon: 'columns-2' },
     { to: `/c/${client.id}/cash-flow`, label: 'Cash flow', icon: 'waves' },
     { to: `/c/${client.id}/general-ledger`, label: 'General ledger', icon: 'library' },
+    { to: `/c/${client.id}/bir-books`, label: 'BIR books', icon: 'landmark' },
     { to: `/c/${client.id}/aging`, label: 'AR/AP aging', icon: 'pie-chart' },
     { heading: 'Setup' },
     { to: `/c/${client.id}/coa`, label: 'Chart of accounts', icon: 'list-tree' },
+    { to: `/c/${client.id}/tax-codes`, label: 'Tax codes', icon: 'file-check' },
     { to: `/c/${client.id}/periods`, label: 'Periods', icon: 'calendar' },
     { to: `/c/${client.id}/settings`, label: 'Client settings', icon: 'settings' },
   ]

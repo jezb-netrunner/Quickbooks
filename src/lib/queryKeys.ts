@@ -28,4 +28,8 @@ export const keys = {
     ['cash-flow', clientId, from, to] as const,
   generalLedger: (clientId: string, accountId: string, from: string, to: string) =>
     ['general-ledger', clientId, accountId, from, to] as const,
+  taxProfile: (clientId: string) => ['tax-profile', clientId] as const,
+  taxCodes: (clientId: string) => ['tax-codes', clientId] as const,
+  birBook: (clientId: string, book: string, from: string, to: string) =>
+    ['bir-book', clientId, book, from, to] as const,
 }

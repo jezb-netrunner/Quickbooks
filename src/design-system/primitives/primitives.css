@@ -148,6 +148,11 @@
   height: 100%;
 }
 .fis-control input::placeholder { color: var(--text-muted); }
+/* Amount fields: the browser's spin buttons are unusable for money entry
+   (field testing) — type the number instead. */
+.fis-control input[type='number'] { appearance: textfield; }
+.fis-control input[type='number']::-webkit-outer-spin-button,
+.fis-control input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* ------------------------------------------------------------- Checkbox */
 .fis-check { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }

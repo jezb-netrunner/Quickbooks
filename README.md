@@ -22,7 +22,10 @@ The browser is untrusted.
 - [x] **Phase 4** — profit & loss, balance sheet, cash flow (indirect), general
       ledger drill-down from the trial balance, control-account guard on
       document lines
-- [ ] Phase 5 — tax profile, VAT/EWT automation, BIR books
+- [x] **Phase 5** — per-client tax profile, effective-dated tax codes (no
+      hardcoded rates), automatic VAT (inclusive/exclusive) and EWT/CWT lines
+      from the posting engine, cash-settled invoices, BIR books (sales,
+      purchases, cash receipts, cash disbursements, general journal)
 - [ ] Phase 6 — return working papers, compliance calendar, 2307s
 - [ ] Phase 7 — bank import, attachments, review workflow, practice dashboard
 
