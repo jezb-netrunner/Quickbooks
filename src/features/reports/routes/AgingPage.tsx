@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { AgingRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchAging(clientId: string, docType: string, asOf: string): Promise<AgingRow[]> {
   const { data, error } = await supabase.rpc('aging', {
@@ -21,10 +22,11 @@ async function fetchAging(clientId: string, docType: string, asOf: string): Prom
 export function AgingPage() {
   const client = useActiveClient()
   const [side, setSide] = useState('invoice')
-  const [asOf, setAsOf] = useState(new Date().toISOString().slice(0, 10))
-  const { data: rows, isPending } = useQuery({
+  const [asOf, setAsOf] = useState(localToday())
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.aging(client.id, side, asOf),
     queryFn: () => fetchAging(client.id, side, asOf),
+    enabled: Boolean(asOf),
   })
 
   const totals = useMemo(() => {
@@ -88,7 +90,7 @@ export function AgingPage() {
             rows={rows ?? []}
             columns={columns}
             rowKey={(r) => r.contact_id}
-            emptyMessage={isPending ? 'Computing…' : `No open ${sideLabel.toLowerCase()} as of this date.`}
+            emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : `No open ${sideLabel.toLowerCase()} as of this date.`}
             dense
           />
           {(rows ?? []).length > 0 && (

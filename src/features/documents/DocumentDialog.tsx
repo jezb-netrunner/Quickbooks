@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react'
 import { messageOf } from '@/lib/errors'
 import { Amount, Button, Checkbox, Dialog, IconButton, Input, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
-import type { Account, Contact, DocumentRow } from '@/lib/database.types'
+import type { Account, Contact, DocumentRow, OpenItemRow } from '@/lib/database.types'
 import { useTaxCodes } from '@/features/tax/hooks'
 import type { TaxCodeWithRate } from '@/features/tax/api'
 import { docLabel, type DocTypeConfig } from './docTypes'
+import { localToday } from '@/lib/dates'
 import {
   useDeleteDocument,
   useDocumentDetail,
@@ -29,15 +30,21 @@ interface EditableApplication {
   amount: string
 }
 
+// Half-away-from-zero at 2 decimals, immune to float dust (102.50 * 0.01 =
+// 1.0250000000000001 must round to 1.03, matching Postgres numeric round()).
+function round2(x: number): number {
+  return Math.round(Number((x * 100).toFixed(4))) / 100
+}
+
 // Client-side preview of the engine's per-line VAT math (the engine recomputes
 // authoritatively at issue, by document date). Inclusive: net = amount/(1+r).
 function lineTax(amount: number, rate: number | null, inclusive: boolean) {
   if (!rate || amount <= 0) return { net: amount, tax: 0 }
   if (inclusive) {
-    const net = Math.round((amount / (1 + rate)) * 100) / 100
-    return { net, tax: Math.round((amount - net) * 100) / 100 }
+    const net = round2(amount / (1 + rate))
+    return { net, tax: round2(amount - net) }
   }
-  return { net: amount, tax: Math.round(amount * rate * 100) / 100 }
+  return { net: amount, tax: round2(amount * rate) }
 }
 
 export function DocumentDialog(props: {
@@ -51,11 +58,25 @@ export function DocumentDialog(props: {
 }) {
   const { data: detail, isPending } = useDocumentDetail(props.clientId, props.document?.id ?? null)
   const { data: taxCodes } = useTaxCodes(props.clientId)
-  if ((props.document && isPending) || taxCodes === undefined) return null
+  // Payments must not render before open items resolve: the form's replace-set
+  // save would otherwise serialize an empty application list and silently
+  // delete a saved draft's applications.
+  const { data: openItems } = useOpenItems(
+    props.clientId,
+    props.config.appliesTo ?? 'invoice',
+    localToday(),
+  )
+  if (
+    (props.document && isPending) ||
+    taxCodes === undefined ||
+    (props.config.appliesTo !== null && openItems === undefined)
+  )
+    return null
   return (
     <DocumentForm
       {...props}
       taxCodes={taxCodes}
+      openItems={openItems ?? []}
       detail={detail ?? { lines: [], applications: [] }}
     />
   )
@@ -67,6 +88,7 @@ function DocumentForm({
   contacts,
   accounts,
   taxCodes,
+  openItems,
   document: doc,
   detail,
   onClose,
@@ -77,6 +99,7 @@ function DocumentForm({
   contacts: Contact[]
   accounts: Account[]
   taxCodes: TaxCodeWithRate[]
+  openItems: OpenItemRow[]
   document: DocumentRow | null
   detail: {
     lines: { account_id: string; description: string; amount: string; tax_code_id: string | null }[]
@@ -91,7 +114,7 @@ function DocumentForm({
   const issue = useIssueDocument(clientId)
   const voidDoc = useVoidDocument(clientId)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localToday()
   const [docDate, setDocDate] = useState(doc?.doc_date ?? today)
   const [dueDate, setDueDate] = useState(doc?.due_date ?? '')
   const [contactId, setContactId] = useState(doc?.contact_id ?? '')
@@ -161,8 +184,8 @@ function DocumentForm({
     return m
   }, [taxCodes])
 
-  // Open items of the chosen contact, for payments
-  const { data: openItems } = useOpenItems(clientId, config.appliesTo ?? 'invoice', today)
+  // Open items of the chosen contact, for payments (fetched by the wrapper
+  // before this form mounts — see DocumentDialog).
   const savedApplied = useMemo(
     () => new Map(detail.applications.map((a) => [a.target_document_id, Number(a.amount)])),
     [detail.applications],
@@ -170,7 +193,7 @@ function DocumentForm({
   const [applications, setApplications] = useState<EditableApplication[] | null>(null)
   const appRows: EditableApplication[] = useMemo(() => {
     if (applications) return applications
-    if (!config.appliesTo || !openItems) return []
+    if (!config.appliesTo) return []
     return openItems
       .filter((o) => o.contact_id === contactId)
       .map((o) => ({
@@ -191,34 +214,41 @@ function DocumentForm({
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
   }
 
-  const lineTotal = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  // Only lines toDraft() will actually keep count toward totals and gating —
+  // an amount with no account chosen must not inflate the total or enable
+  // issuing a smaller document than the screen shows.
+  const completeLines = useMemo(
+    () => lines.filter((l) => l.account_id && Number(l.amount) > 0),
+    [lines],
+  )
+  const lineTotal = completeLines.reduce((s, l) => s + Number(l.amount), 0)
+  const hasIncompleteLine = lines.some((l) => Number(l.amount) > 0 && !l.account_id)
   const appTotal = appRows.reduce((s, a) => s + (Number(a.amount) || 0), 0)
 
   // Live tax preview mirroring the engine's math.
   const taxPreview = useMemo(() => {
     let net = 0
     let vat = 0
-    for (const l of lines) {
-      const amount = Number(l.amount) || 0
-      if (amount <= 0) continue
+    for (const l of completeLines) {
+      const amount = Number(l.amount)
       const r = l.tax_code_id ? (rateOf.get(l.tax_code_id) ?? null) : null
       const t = lineTax(amount, r, inclusive)
       net += t.net
       vat += t.tax
     }
-    return { net: Math.round(net * 100) / 100, vat: Math.round(vat * 100) / 100 }
-  }, [lines, rateOf, inclusive])
+    return { net: round2(net), vat: round2(vat) }
+  }, [completeLines, rateOf, inclusive])
   const whtRate = whtCodeId ? (rateOf.get(whtCodeId) ?? null) : null
-  const whtAmount =
-    whtCodeId && whtRate && Number(whtBase) > 0
-      ? Math.round(Number(whtBase) * whtRate * 100) / 100
-      : 0
+  const whtAmount = whtCodeId && whtRate && Number(whtBase) > 0 ? round2(Number(whtBase) * whtRate) : 0
   const docGross = taxPreview.net + taxPreview.vat
   const grandTotal =
     config.type === 'invoice' || config.type === 'bill'
       ? docGross
       : appTotal + docGross - whtAmount
-  const issueGate = config.type === 'invoice' || config.type === 'bill' ? lineTotal : appTotal + lineTotal
+  const issueGate =
+    (config.type === 'invoice' || config.type === 'bill' ? lineTotal : appTotal + lineTotal) > 0 &&
+    !hasIncompleteLine &&
+    !(config.hasBank && !bankAccountId)
 
   function toDraft() {
     return {
@@ -324,7 +354,7 @@ function DocumentForm({
             </Button>
             <Button
               variant="accent"
-              disabled={busy || !contactId || issueGate <= 0 || (config.hasSettlement && settleCash && !bankAccountId)}
+              disabled={busy || !contactId || !issueGate || (config.hasSettlement && settleCash && !bankAccountId)}
               onClick={() =>
                 save.mutate(
                   { documentId: doc?.id ?? null, draft: toDraft() },

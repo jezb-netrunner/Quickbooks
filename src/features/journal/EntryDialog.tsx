@@ -4,6 +4,7 @@ import { Amount, Button, Dialog, IconButton, Input, Select } from '@/design-syst
 import { FormError } from '@/auth/AuthCard'
 import { useEntryLines, useDeleteDraft, usePostEntry, useReverseEntry, useSaveDraft } from './hooks'
 import type { Account, JournalEntry } from '@/lib/database.types'
+import { localToday } from '@/lib/dates'
 
 interface EditableLine {
   account_id: string
@@ -56,7 +57,7 @@ function EntryForm({
   const postEntry = usePostEntry(clientId)
   const reverseEntry = useReverseEntry(clientId)
 
-  const [entryDate, setEntryDate] = useState(entry?.entry_date ?? new Date().toISOString().slice(0, 10))
+  const [entryDate, setEntryDate] = useState(entry?.entry_date ?? localToday())
   const [memo, setMemo] = useState(entry?.memo ?? '')
   const [lines, setLines] = useState<EditableLine[]>(initialLines)
   const [error, setError] = useState<string | null>(null)

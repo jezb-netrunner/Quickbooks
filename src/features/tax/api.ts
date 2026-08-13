@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { ClientTaxProfile, TaxCode, TaxCodeRate, TaxRegime } from '@/lib/database.types'
+import { localToday } from '@/lib/dates'
 
 export interface TaxCodeWithRate extends TaxCode {
   /** The rate in force today, as a number (0.12 = 12%). Null when none set. */
@@ -28,7 +29,7 @@ export async function fetchTaxCodes(clientId: string): Promise<TaxCodeWithRate[]
   ])
   if (codes.error) throw codes.error
   if (rates.error) throw rates.error
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localToday()
   return codes.data.map((c) => {
     const codeRates = rates.data.filter((r) => r.tax_code_id === c.id)
     const current = codeRates.find((r) => r.effective_from <= today)

@@ -6,6 +6,7 @@ import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 // One page, five books. Each book definition maps an RPC to its columnar
 // layout, the same layout the export produces — the loose-leaf format.
@@ -76,10 +77,10 @@ export function BirBooksPage() {
   const year = new Date().getFullYear()
   const [bookKey, setBookKey] = useState<BookKey>('sales')
   const [from, setFrom] = useState(`${year}-01-01`)
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [to, setTo] = useState(localToday())
   const book = BOOKS.find((b) => b.key === bookKey) as BookDef
 
-  const { data: rows, isPending } = useQuery({
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.birBook(client.id, book.key, from, to),
     queryFn: async () => {
       const { data, error } = await supabase.rpc(book.rpc, {
@@ -146,7 +147,7 @@ export function BirBooksPage() {
             rows={rows ?? []}
             columns={columns}
             rowKey={book.rowKey}
-            emptyMessage={isPending ? 'Computing…' : 'Nothing in this book for the range.'}
+            emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : 'Nothing in this book for the range.'}
             dense
           />
         </Card>

@@ -33,3 +33,15 @@ export const keys = {
   birBook: (clientId: string, book: string, from: string, to: string) =>
     ['bir-book', clientId, book, from, to] as const,
 }
+
+// Every report family that reads the posted ledger. Mutations that post,
+// reverse, issue, or void MUST invalidate all of these — a cached "Balanced"
+// trial balance that omits the entry just posted is worse than a refetch.
+export const ledgerReportPrefixes = [
+  'trial-balance',
+  'pnl',
+  'balance-sheet',
+  'cash-flow',
+  'general-ledger',
+  'bir-book',
+] as const

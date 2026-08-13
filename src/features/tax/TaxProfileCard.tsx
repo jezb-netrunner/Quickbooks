@@ -11,7 +11,9 @@ import { useSeedTaxCodes, useTaxProfile } from './hooks'
 export function TaxProfileCard({ clientId }: { clientId: string }) {
   const { data: profile, isPending } = useTaxProfile(clientId)
   const seed = useSeedTaxCodes(clientId)
-  const [regime, setRegime] = useState<TaxRegime>('vat')
+  // null = untouched; the stored regime (or 'vat') shows until the user picks.
+  const [regime, setRegime] = useState<TaxRegime | null>(null)
+  const effectiveRegime: TaxRegime = regime ?? profile?.regime ?? 'vat'
   const [error, setError] = useState<string | null>(null)
 
   return (
@@ -31,13 +33,13 @@ export function TaxProfileCard({ clientId }: { clientId: string }) {
                 { value: 'vat', label: 'VAT-registered (12% VAT applies)' },
                 { value: 'non_vat', label: 'Non-VAT (percentage tax, no VAT codes)' },
               ]}
-              value={profile?.regime ?? regime}
+              value={effectiveRegime}
               onChange={(e) => setRegime(e.target.value as TaxRegime)}
               disabled={seed.isPending}
             />
             <p style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>
               {profile
-                ? 'Setup is done. Re-running keeps existing codes and only adds missing ones. Verify rates on the Tax codes screen — the engine reads rates from there, never from code.'
+                ? 'Setup is done. Re-running keeps existing codes, adds missing ones, and switching the registration toggles the VAT codes on or off. Verify rates on the Tax codes screen — the engine reads rates from there, never from code.'
                 : 'Seeds the starter VAT and withholding codes for this client. The rates are provisional defaults for you to verify.'}
             </p>
             <div>
@@ -46,12 +48,19 @@ export function TaxProfileCard({ clientId }: { clientId: string }) {
                 disabled={seed.isPending}
                 onClick={() => {
                   setError(null)
-                  seed.mutate((profile?.regime ?? regime) as TaxRegime, {
+                  seed.mutate(effectiveRegime, {
+                    onSuccess: () => setRegime(null),
                     onError: (err) => setError(messageOf(err, 'Could not set up tax codes.')),
                   })
                 }}
               >
-                {seed.isPending ? 'Working' : profile ? 'Re-run setup' : 'Set up tax codes'}
+                {seed.isPending
+                  ? 'Working'
+                  : profile
+                    ? regime && regime !== profile.regime
+                      ? 'Apply registration change'
+                      : 'Re-run setup'
+                    : 'Set up tax codes'}
               </Button>
             </div>
           </>

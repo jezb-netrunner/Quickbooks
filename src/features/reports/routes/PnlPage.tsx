@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { PnlRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchPnl(clientId: string, from: string, to: string): Promise<PnlRow[]> {
   const { data, error } = await supabase.rpc('profit_and_loss', {
@@ -51,9 +52,9 @@ export function PnlPage() {
   const client = useActiveClient()
   const year = new Date().getFullYear()
   const [from, setFrom] = useState(`${year}-01-01`)
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [to, setTo] = useState(localToday())
 
-  const { data: rows, isPending } = useQuery({
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.pnl(client.id, from, to),
     queryFn: () => fetchPnl(client.id, from, to),
     enabled: Boolean(from && to),
@@ -100,7 +101,7 @@ export function PnlPage() {
             rows={income}
             columns={rowColumns}
             rowKey={(r) => r.code}
-            emptyMessage={isPending ? 'Computing…' : 'No income posted in this range.'}
+            emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : 'No income posted in this range.'}
             dense
           />
           {income.length > 0 && <SectionFoot label="Total income" value={totalIncome} />}
@@ -110,7 +111,7 @@ export function PnlPage() {
             rows={expenses}
             columns={rowColumns}
             rowKey={(r) => r.code}
-            emptyMessage={isPending ? 'Computing…' : 'No expenses posted in this range.'}
+            emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : 'No expenses posted in this range.'}
             dense
           />
           {expenses.length > 0 && <SectionFoot label="Total expenses" value={totalExpenses} />}

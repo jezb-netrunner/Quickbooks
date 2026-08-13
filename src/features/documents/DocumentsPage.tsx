@@ -8,6 +8,7 @@ import type { DocType, DocumentRow } from '@/lib/database.types'
 import { DOC_TYPES, docLabel } from './docTypes'
 import { DocumentDialog } from './DocumentDialog'
 import { useDocuments, useOpenItems } from './hooks'
+import { localToday } from '@/lib/dates'
 
 export function DocumentsPage({ docType }: { docType: DocType }) {
   const config = DOC_TYPES[docType]
@@ -15,9 +16,15 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
   const { data: documents } = useDocuments(client.id, docType)
   const { data: contacts } = useContacts(client.id)
   const { data: accounts } = useAccounts(client.id)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localToday()
   const showsOpenItems = docType === 'invoice' || docType === 'bill'
-  const { data: openItems } = useOpenItems(client.id, showsOpenItems ? docType : 'invoice', today)
+  // Payment pages warm the open-items cache their dialog will need (bills for
+  // money-out, invoices for money-in), not a fixed 'invoice' fallback.
+  const { data: openItems } = useOpenItems(
+    client.id,
+    showsOpenItems ? docType : (config.appliesTo ?? 'invoice'),
+    today,
+  )
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selected, setSelected] = useState<DocumentRow | null>(null)

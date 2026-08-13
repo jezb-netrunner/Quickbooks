@@ -6,6 +6,7 @@ import { FormError } from '@/auth/AuthCard'
 import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { useAddTaxRate, useTaxCodes, useUpdateTaxCode } from './hooks'
 import type { TaxCodeWithRate } from './api'
+import { localToday } from '@/lib/dates'
 
 const KIND_LABEL: Record<string, string> = {
   output_vat: 'Output VAT',
@@ -100,7 +101,7 @@ function EditTaxCodeDialog({
   const [atc, setAtc] = useState(code.atc)
   const [active, setActive] = useState(code.active)
   const [newRate, setNewRate] = useState('')
-  const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10))
+  const [effectiveFrom, setEffectiveFrom] = useState(localToday())
   const [error, setError] = useState<string | null>(null)
   const busy = update.isPending || addRate.isPending
 

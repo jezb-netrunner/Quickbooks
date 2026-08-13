@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { keys } from '@/lib/queryKeys'
 import type { CashFlowRow } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
+import { localToday } from '@/lib/dates'
 
 async function fetchCashFlow(clientId: string, from: string, to: string): Promise<CashFlowRow[]> {
   const { data, error } = await supabase.rpc('cash_flow_indirect', {
@@ -33,9 +34,9 @@ export function CashFlowPage() {
   const client = useActiveClient()
   const year = new Date().getFullYear()
   const [from, setFrom] = useState(`${year}-01-01`)
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10))
+  const [to, setTo] = useState(localToday())
 
-  const { data: rows, isPending } = useQuery({
+  const { data: rows, isPending, isError } = useQuery({
     queryKey: keys.cashFlow(client.id, from, to),
     queryFn: () => fetchCashFlow(client.id, from, to),
     enabled: Boolean(from && to),
@@ -97,7 +98,7 @@ export function CashFlowPage() {
                 rows={items}
                 columns={rowColumns}
                 rowKey={(r) => `${r.section}:${r.label}`}
-                emptyMessage={isPending ? 'Computing…' : 'No movements in this range.'}
+                emptyMessage={isPending ? 'Computing…' : isError ? 'Could not load this report — check the connection and retry.' : 'No movements in this range.'}
                 dense
               />
               {items.length > 0 && (
