@@ -1,5 +1,5 @@
 -- Phase 3 remediation — accounting integrity (batch 1).
--- Fixes audit finding P3-05.
+-- Fixes audit findings P3-05 and P3-16.
 
 -- ---------------------------------------------------------------------------
 -- P3-05 — reverse_entry had a check-then-act race: it read reversed_by, checked
@@ -25,11 +25,19 @@ declare
   v_status text;
   v_reversed uuid;
 begin
-  select e.id, e.client_id, e.status, e.entry_date, e.entry_no, e.memo, e.reversed_by into v_entry
+  select e.id, e.client_id, e.status, e.entry_date, e.entry_no, e.memo, e.reversed_by, e.source_type
+    into v_entry
   from public.journal_entries e where e.id = p_entry_id;
   if v_entry.id is null then raise exception 'entry not found'; end if;
   if not (select app.can_write_client(v_entry.client_id)) then
     raise exception 'not authorized';
+  end if;
+  -- P3-16: a reversal entry must not itself be reversed. Reversing a reversal
+  -- (raw RPC only; the UI hides it) builds a duplicated chain and leaves the
+  -- original reading "reversed" while it is economically live again. Void or
+  -- correct the source entry instead.
+  if v_entry.source_type = 'reversal' then
+    raise exception 'a reversal entry cannot itself be reversed';
   end if;
 
   -- Serialize reversals of this client (post_entry takes the same key later; the

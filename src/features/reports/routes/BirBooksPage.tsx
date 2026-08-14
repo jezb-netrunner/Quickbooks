@@ -40,8 +40,8 @@ const BOOKS: BookDef[] = [
     rpc: 'purchases_book',
     header: ['Date', 'Bill', 'Supplier', 'TIN', 'Status', 'Gross', 'Exempt', 'Taxable', 'Input VAT'],
     numericFrom: 5,
-    toRow: (r) => [asS(r.doc_date), `BILL-${asS(r.doc_no)}`, asS(r.supplier), asS(r.tin), asS(r.status), asS(r.gross), asS(r.exempt), asS(r.taxable), asS(r.input_vat)],
-    rowKey: (r) => `p${asS(r.doc_no)}`,
+    toRow: (r) => [asS(r.doc_date), asS(r.ref), asS(r.supplier), asS(r.tin), asS(r.status), asS(r.gross), asS(r.exempt), asS(r.taxable), asS(r.input_vat)],
+    rowKey: (r) => `p${asS(r.ref)}`,
   },
   {
     key: 'cash_receipts',

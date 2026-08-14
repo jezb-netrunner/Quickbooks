@@ -4,7 +4,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 \ir 000_fixture.sql.inc
 
@@ -61,6 +61,13 @@ select throws_like(
   $$ select public.reverse_entry(tap.v('je')) $$,
   '%already reversed%',
   'P3-05: reversing the same entry a second time is rejected'
+);
+-- P3-16: the reversing entry itself cannot be reversed.
+select throws_like(
+  $$ select public.reverse_entry(
+       (select id from public.journal_entries where reversal_of = tap.v('je') limit 1)) $$,
+  '%reversal entry cannot itself be reversed%',
+  'P3-16: a reversal entry cannot itself be reversed'
 );
 select tap.logout();
 
