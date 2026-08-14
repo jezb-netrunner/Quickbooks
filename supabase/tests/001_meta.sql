@@ -3,7 +3,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(8);
 
 select is_empty(
   $$ select c.relname
@@ -33,6 +33,25 @@ select is_empty(
      from information_schema.role_routine_grants
      where routine_schema in ('public', 'app') and grantee = 'anon' $$,
   'anon holds zero function privileges in public/app'
+);
+
+-- P4-08: anon is a member of PUBLIC, so a GRANT ... TO PUBLIC (grantee='PUBLIC')
+-- slips past the anon-only checks above (this is how P4-07 hid). Tripwire the
+-- API-EXPOSED schema explicitly. Scope is 'public' only: PostgREST exposes just
+-- the public schema, so a PUBLIC grant there is anon-reachable, whereas the app
+-- schema is never a REST endpoint. (App-schema PUBLIC grants exist but are not
+-- reachable — see docs/audit-2026-08.md "Found during remediation".)
+select is_empty(
+  $$ select table_name || ' ' || privilege_type
+     from information_schema.role_table_grants
+     where table_schema = 'public' and grantee = 'PUBLIC' $$,
+  'PUBLIC holds zero table privileges in the exposed public schema'
+);
+select is_empty(
+  $$ select routine_name
+     from information_schema.role_routine_grants
+     where routine_schema = 'public' and grantee = 'PUBLIC' $$,
+  'PUBLIC holds zero function privileges in the exposed public schema'
 );
 
 select is_empty(
