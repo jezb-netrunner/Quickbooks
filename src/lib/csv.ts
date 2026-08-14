@@ -41,13 +41,23 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => r.some((c) => c.trim() !== ''))
 }
 
+// Escape one CSV cell. Two jobs:
+//  1. Formula/DDE injection: a cell whose first character is = + - @ TAB or CR
+//     is executed by Excel/Sheets when the file is opened. Prefix such a cell
+//     with a single quote so it is shown literally. Genuine numbers (typed
+//     numbers, or numeric strings like "-1234.50") are never formulas and are
+//     left untouched so negative amounts still read as numbers.
+//  2. RFC 4180 quoting for cells containing quotes, commas, or newlines.
+export function csvCell(v: string | number): string {
+  let s = String(v)
+  const isNumeric = typeof v === 'number' || /^-?\d+(\.\d+)?$/.test(s)
+  if (!isNumeric && /^[=+\-@\t\r]/.test(s)) s = "'" + s
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
 // Minimal CSV download for report exports (README: every report exportable).
 export function downloadCsv(filename: string, header: string[], rows: (string | number)[][]) {
-  const escape = (v: string | number) => {
-    const s = String(v)
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const body = [header, ...rows].map((r) => r.map(escape).join(',')).join('\n')
+  const body = [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n')
   const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

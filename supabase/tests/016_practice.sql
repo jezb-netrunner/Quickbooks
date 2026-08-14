@@ -5,7 +5,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(25);
 
 \ir 000_fixture.sql.inc
 
@@ -225,6 +225,22 @@ select is(
   (select count(*) from public.practice_dashboard() where client_id = tap.v('a1')),
   0::bigint,
   'firm B''s practice dashboard never shows firm A clients'
+);
+select tap.logout();
+
+-- P4-10: import_bank_txns input guards (Phase 2 security hardening)
+select tap.login('22222222-2222-4222-8222-222222222202');  -- staff_a, assigned a1
+select throws_like(
+  $$ select public.import_bank_txns(tap.v('a1'), tap.v('acc_cash'), '{}'::jsonb) $$,
+  '%must be a JSON array%',
+  'P4-10: a non-array rows payload is rejected with a clear error, not a raw exception'
+);
+select throws_like(
+  $$ select public.import_bank_txns(tap.v('a1'), tap.v('acc_cash'),
+       (select jsonb_agg(jsonb_build_object('d', '2026-08-01', 'm', 'x', 'a', 1))
+        from generate_series(1, 5001))) $$,
+  '%too many rows%',
+  'P4-10: an over-cap import (>5000 rows) is rejected'
 );
 select tap.logout();
 
