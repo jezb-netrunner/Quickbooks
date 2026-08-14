@@ -1,6 +1,8 @@
 -- Phase 3 remediation — accounting integrity (batch 4).
--- Fixes audit finding P3-02 (manual JE / bank categorize bypass the
--- control-account guard, desyncing the subledgers and inventory from the GL).
+-- Fixes audit findings P3-02 (manual JE / bank categorize bypass the
+-- control-account guard, desyncing the subledgers and inventory from the GL)
+-- and P3-11 (an entry whose account was archived after posting could not be
+-- reversed or voided — the reversal re-posts through the archived-account check).
 --
 -- The document engine, reversals, opening balances, bank imports, and stock
 -- adjustments legitimately post to control accounts — so the guard must fire
@@ -143,7 +145,11 @@ begin
     raise exception 'entry date % is outside the posting period', new.entry_date;
   end if;
 
-  if exists (
+  -- P3-11: a reversal replays the ORIGINAL entry's lines to undo history, so it
+  -- must be allowed even if one of those accounts was archived after the original
+  -- posted (otherwise the entry — and void_document, which reverses — can never be
+  -- corrected). New postings still may not use an archived account.
+  if new.source_type <> 'reversal' and exists (
     select 1 from public.journal_lines l
     join public.accounts a on a.id = l.account_id
     where l.entry_id = new.id and a.archived_at is not null

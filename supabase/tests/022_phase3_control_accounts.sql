@@ -5,7 +5,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(2);
+select plan(3);
 
 \ir 000_fixture.sql.inc
 
@@ -45,6 +45,16 @@ select throws_like(
 select lives_ok(
   $$ select public.post_entry(tap.v('je_ok')) $$,
   'P3-02: a normal manual JE (no control accounts) still posts'
+);
+select tap.logout();
+
+-- P3-11: archive an account that the posted entry used, then reverse it — the
+-- reversal replays the original lines and must be allowed despite the archive.
+update public.accounts set archived_at = now() where id = tap.v('acc_rent');
+select tap.login('22222222-2222-4222-8222-222222222201');
+select lives_ok(
+  $$ select public.reverse_entry(tap.v('je_ok')) $$,
+  'P3-11: an entry using a since-archived account can still be reversed/voided'
 );
 select tap.logout();
 
