@@ -180,10 +180,13 @@ select ok(
   'the calendar generates four 2550Q deadlines, Q1 due April 25'
 );
 select ok(
-  (select count(*) filter (where form = '0619-E') = 12
+  -- P2-26: months 3/6/9/12 fold into the 1601-EQ, so 0619-E runs 8 periods.
+  (select count(*) filter (where form = '0619-E') = 8
+      and count(*) filter (where form = '0619-E'
+                           and extract(month from period_end) in (3, 6, 9, 12)) = 0
       and count(*) filter (where form = '1701Q') = 3
    from public.compliance_calendar(tap.v('a1'), 2026)),
-  'monthly EWT runs twelve periods; quarterly income tax skips Q4'
+  'monthly EWT runs eight periods (quarter months fold into 1601-EQ); quarterly income tax skips Q4'
 );
 select is(
   (select due_date from public.compliance_calendar(tap.v('a1'), 2026)
