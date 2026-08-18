@@ -71,7 +71,13 @@ export function ClientSetupWizard({
               { value: 'non_vat', label: 'Non-VAT (percentage tax, no VAT codes)' },
             ]}
             value={regime}
-            onChange={(e) => setRegime(e.target.value as TaxRegime)}
+            onChange={(e) => {
+              const next = e.target.value as TaxRegime
+              setRegime(next)
+              // The 8% option is only for non-VAT individuals (TRAIN): flipping
+              // to VAT while 8% is selected falls back to the graduated table.
+              if (next === 'vat' && option === 'eight_percent') setOption('graduated')
+            }}
             disabled={create.isPending}
           />
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
@@ -96,7 +102,10 @@ export function ClientSetupWizard({
                   ? [{ value: 'rcit', label: 'Regular corporate (RCIT)' }]
                   : [
                       { value: 'graduated', label: 'Graduated table' },
-                      { value: 'eight_percent', label: '8% of gross option' },
+                      // Only non-VAT individuals may elect the 8% (TRAIN).
+                      ...(regime === 'non_vat'
+                        ? [{ value: 'eight_percent', label: '8% of gross option' }]
+                        : []),
                     ]
               }
               value={option}
