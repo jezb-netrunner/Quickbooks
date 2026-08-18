@@ -33,6 +33,8 @@ interface EditableApplication {
   target_document_id: string
   label: string
   open: number
+  gross: number
+  net: number
   amount: string
 }
 
@@ -153,6 +155,14 @@ function DocumentForm({
   )
   const [whtCodeId, setWhtCodeId] = useState(doc?.wht_tax_code_id ?? '')
   const [whtBase, setWhtBase] = useState(doc?.wht_base != null ? String(doc.wht_base) : '')
+  // The base auto-derives from the applied documents' net-of-VAT until the
+  // preparer types their own (a stored draft base counts as typed).
+  const [whtBaseTouched, setWhtBaseTouched] = useState(doc?.wht_base != null)
+  // P3-01: after the first successful save, retries must UPDATE this draft —
+  // the doc prop never changes, so track the server-assigned id ourselves.
+  // Without this, a failed issue left doc null and the next click inserted
+  // (and issued) a second copy of the same document.
+  const [savedId, setSavedId] = useState<string | null>(doc?.id ?? null)
   // Default a new line to the standard 12% VAT for VAT-registered clients, so a
   // VAT invoice/bill applies output/input VAT without hunting for the per-line
   // picker. Empty for non-VAT clients and doc types without line VAT (the find
@@ -298,6 +308,8 @@ function DocumentForm({
         // Draft applications never count toward open_items, so the balance
         // shown is the true headroom even while re-editing this draft.
         open: Number(o.balance),
+        gross: Number(o.total),
+        net: Number(o.net),
         amount: savedApplied.has(o.document_id) ? String(savedApplied.get(o.document_id)) : '',
       }))
   }, [applications, openItems, contactId, config.appliesTo, savedApplied])
@@ -342,8 +354,26 @@ function DocumentForm({
     }
     return { net: round2(net), vat: round2(vat) }
   }, [completeLines, rateOf, inclusive])
+  // T-04: decompose what this payment settles. Each application is gross;
+  // its net/VAT split pro-rates by the target document's frozen shares —
+  // mirroring the engine's P3-03 ceiling (round per application, then sum).
+  const appliedSplit = useMemo(() => {
+    let net = 0
+    let vatPart = 0
+    for (const a of appRows) {
+      const amt = Number(a.amount)
+      if (!(amt > 0) || !(a.gross > 0)) continue
+      const n = round2((amt * a.net) / a.gross)
+      net += n
+      vatPart += round2(amt - n)
+    }
+    return { net: round2(net), vat: round2(vatPart) }
+  }, [appRows])
+  const suggestedBase = appliedSplit.net
+  const effectiveWhtBase = whtBaseTouched ? whtBase : suggestedBase > 0 ? String(suggestedBase) : ''
   const whtRate = whtCodeId ? (rateOf.get(whtCodeId) ?? null) : null
-  const whtAmount = whtCodeId && whtRate && Number(whtBase) > 0 ? round2(Number(whtBase) * whtRate) : 0
+  const whtAmount =
+    whtCodeId && whtRate && Number(effectiveWhtBase) > 0 ? round2(Number(effectiveWhtBase) * whtRate) : 0
   const docGross = taxPreview.net + taxPreview.vat
   const grandTotal =
     config.appliesTo === null ? docGross : appTotal + docGross - whtAmount
@@ -363,8 +393,14 @@ function DocumentForm({
           : null,
       memo: memo.trim(),
       amountsIncludeTax: inclusive,
-      whtTaxCodeId: config.whtKind && whtCodeId ? whtCodeId : null,
-      whtBase: config.whtKind && whtCodeId && Number(whtBase) > 0 ? Number(whtBase) : null,
+      // Code and base save as a pair (the documents_wht_pair_check demands
+      // it): a code with no positive base serializes as no withholding.
+      whtTaxCodeId:
+        config.whtKind && whtCodeId && Number(effectiveWhtBase) > 0 ? whtCodeId : null,
+      whtBase:
+        config.whtKind && whtCodeId && Number(effectiveWhtBase) > 0
+          ? Number(effectiveWhtBase)
+          : null,
       lines: lines
         .filter((l) => l.account_id && Number(l.amount) > 0 && (!l.item_id || Number(l.qty) > 0))
         .map((l) => ({
@@ -455,9 +491,9 @@ function DocumentForm({
               disabled={busy || !contactId}
               onClick={() =>
                 save.mutate(
-                  { documentId: doc?.id ?? null, draft: toDraft() },
+                  { documentId: savedId, draft: toDraft() },
                   {
-                    onSuccess: () => { onDone('Draft saved'); onClose() },
+                    onSuccess: (id) => { setSavedId(id); onDone('Draft saved'); onClose() },
                     onError: (err) => setError(messageOf(err, 'Could not save the draft.')),
                   },
                 )
@@ -470,10 +506,11 @@ function DocumentForm({
               disabled={busy || !contactId || !issueGate || (config.hasSettlement && settleCash && !bankAccountId)}
               onClick={() =>
                 save.mutate(
-                  { documentId: doc?.id ?? null, draft: toDraft() },
+                  { documentId: savedId, draft: toDraft() },
                   {
-                    onSuccess: (id) =>
-                      mustSubmit
+                    onSuccess: (id) => {
+                      setSavedId(id)
+                      return mustSubmit
                         ? submitDoc.mutate(id, {
                             onSuccess: () => { onDone('Submitted for review'); onClose() },
                             onError: (err) => setError(messageOf(err, 'Could not submit the document.')),
@@ -481,7 +518,8 @@ function DocumentForm({
                         : issue.mutate(id, {
                             onSuccess: (no) => { onDone(`Issued as ${config.prefix}-${no}`); onClose() },
                             onError: (err) => setError(messageOf(err, 'Could not issue the document.')),
-                          }),
+                          })
+                    },
                     onError: (err) => setError(messageOf(err, 'Could not save the draft.')),
                   },
                 )
@@ -570,24 +608,35 @@ function DocumentForm({
                 Nothing open for this {config.contactSide}.
               </p>
             ) : (
-              appRows.map((a, i) => (
-                <div key={a.target_document_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 120px 130px', gap: 8, alignItems: 'center' }}>
-                  <span style={{ font: '400 13px/1.3 var(--font-mono)' }}>{a.label}</span>
-                  <span style={{ textAlign: 'right' }}>
-                    <Amount value={a.open} muted />
-                  </span>
-                  <Input
-                    aria-label={`Amount for ${a.label}`}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={a.amount}
-                    disabled={isIssued}
-                    onChange={(e) => setApp(i, e.target.value)}
-                  />
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px 110px 130px', gap: 8 }}>
+                  <span />
+                  <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)', textAlign: 'right' }}>Open (gross)</span>
+                  <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)', textAlign: 'right' }}>Net of VAT</span>
+                  <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)', textAlign: 'right' }}>Apply</span>
                 </div>
-              ))
+                {appRows.map((a, i) => (
+                  <div key={a.target_document_id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px 110px 130px', gap: 8, alignItems: 'center' }}>
+                    <span style={{ font: '400 13px/1.3 var(--font-mono)' }}>{a.label}</span>
+                    <span style={{ textAlign: 'right' }}>
+                      <Amount value={a.open} muted />
+                    </span>
+                    <span style={{ textAlign: 'right' }}>
+                      <Amount value={a.gross > 0 ? round2((a.open * a.net) / a.gross) : a.open} muted />
+                    </span>
+                    <Input
+                      aria-label={`Amount for ${a.label}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={a.amount}
+                      disabled={isIssued}
+                      onChange={(e) => setApp(i, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </>
             )}
           </div>
         )}
@@ -617,14 +666,26 @@ function DocumentForm({
                 min="0"
                 step="0.01"
                 placeholder="0.00"
-                value={whtBase}
+                value={effectiveWhtBase}
                 disabled={isIssued || !whtCodeId}
-                onChange={(e) => setWhtBase(e.target.value)}
+                onChange={(e) => {
+                  setWhtBaseTouched(true)
+                  setWhtBase(e.target.value)
+                }}
               />
               <div style={{ textAlign: 'right', paddingBottom: 9 }}>
                 <Amount value={whtAmount} muted />
               </div>
             </div>
+            {whtCodeId && suggestedBase > 0 && whtBaseTouched && Number(whtBase) !== suggestedBase && !isIssued && (
+              <button
+                type="button"
+                onClick={() => { setWhtBaseTouched(false); setWhtBase('') }}
+                style={{ justifySelf: 'start', background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'var(--type-label)', color: 'var(--accent-600, var(--text-secondary))', textDecoration: 'underline' }}
+              >
+                Use the applied net of VAT: {suggestedBase.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+              </button>
+            )}
           </div>
         )}
 
@@ -731,6 +792,22 @@ function DocumentForm({
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
                 <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>VAT</span>
                 <Amount value={taxPreview.vat} muted />
+              </div>
+            </>
+          )}
+          {config.appliesTo !== null && appTotal > 0 && appliedSplit.vat > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>Applied (gross)</span>
+                <Amount value={appTotal} muted />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>of which VAT</span>
+                <Amount value={appliedSplit.vat} muted />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>Net of VAT</span>
+                <Amount value={appliedSplit.net} muted />
               </div>
             </>
           )}

@@ -92,10 +92,17 @@ export async function importBankTxns(
   return data[0] ?? { inserted: 0, duplicates: 0, skipped: 0 }
 }
 
-export async function categorizeBankTxn(txnId: string, accountId: string): Promise<void> {
+export async function categorizeBankTxn(
+  txnId: string,
+  accountId: string,
+  taxCodeId: string | null = null,
+): Promise<void> {
   const { error } = await supabase.rpc('categorize_bank_txn', {
     p_txn_id: txnId,
     p_account_id: accountId,
+    // P2-22: an input-VAT code splits the outflow into net + VAT, so
+    // bank-captured expenses reach the 2550Q input-tax line.
+    p_tax_code_id: taxCodeId,
   })
   if (error) throw error
 }

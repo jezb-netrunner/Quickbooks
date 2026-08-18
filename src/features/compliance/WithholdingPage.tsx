@@ -9,6 +9,7 @@ import { localToday } from '@/lib/dates'
 import type { WhtByContactRow, WhtCertificate } from '@/lib/database.types'
 import type { ReportExport } from '@/lib/exports'
 import {
+  monthRange,
   quarterRange,
   useCertificates,
   useCreateCertificate,
@@ -17,12 +18,23 @@ import {
   useWhtRegister,
 } from './hooks'
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 export function WithholdingPage() {
   const client = useActiveClient()
-  const year = new Date().getFullYear()
+  // P2-21: any year is reachable (every January the prior year's Q4 is the
+  // one being filed); P2-26: months join quarters in the same picker, so the
+  // monthly 0619-E figures are one selection away.
+  const thisYear = new Date().getFullYear()
+  const [year, setYear] = useState(thisYear)
   const [tab, setTab] = useState('issue')
-  const [q, setQ] = useState('1')
-  const range = quarterRange(year, Number(q) as 1 | 2 | 3 | 4)
+  const [period, setPeriod] = useState('q1')
+  const range = period.startsWith('q')
+    ? quarterRange(year, Number(period.slice(1)) as 1 | 2 | 3 | 4)
+    : monthRange(year, Number(period.slice(1)))
+  const periodLabel = period.startsWith('q')
+    ? `Q${period.slice(1)} ${year}`
+    : `${MONTH_LABELS[Number(period.slice(1)) - 1]} ${year}`
 
   const { data: toIssue } = useWhtRegister('issued', client.id, range.from, range.to)
   const { data: received } = useWhtRegister('received', client.id, range.from, range.to)
@@ -39,9 +51,9 @@ export function WithholdingPage() {
 
   const activeRows = tab === 'issue' ? (toIssue ?? []) : tab === 'received' ? (received ?? []) : []
   const exportReport = (): ReportExport => ({
-    filename: `2307-${tab}_${client.code ?? client.name}_Q${q}-${year}`,
+    filename: `2307-${tab}_${client.code ?? client.name}_${periodLabel.replace(' ', '-')}`,
     title: tab === 'issue' ? '2307s to issue (EWT by vendor)' : '2307s received (CWT by customer)',
-    subtitle: [client.name, `Q${q} ${year} (${range.from} to ${range.to})`],
+    subtitle: [client.name, `${periodLabel} (${range.from} to ${range.to})`],
     header: [tab === 'issue' ? 'Vendor' : 'Customer', 'TIN', 'ATC', 'Income payment', 'Tax withheld'],
     rows: activeRows.map((r) => [r.contact_name, r.tin, r.atc, r.base, r.tax]),
     numericColumns: [3, 4],
@@ -66,14 +78,31 @@ export function WithholdingPage() {
             ]}
           />
           {tab !== 'log' && (
-            <div style={{ width: 140 }}>
-              <Select
-                label="Quarter"
-                fieldSize="sm"
-                options={[1, 2, 3, 4].map((n) => ({ value: String(n), label: `Q${n} ${year}` }))}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ width: 110 }}>
+                <Select
+                  label="Year"
+                  fieldSize="sm"
+                  options={Array.from({ length: 6 }, (_, i) => thisYear + 1 - i).map((y) => ({
+                    value: String(y),
+                    label: String(y),
+                  }))}
+                  value={String(year)}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                />
+              </div>
+              <div style={{ width: 150 }}>
+                <Select
+                  label="Period"
+                  fieldSize="sm"
+                  options={[
+                    ...[1, 2, 3, 4].map((n) => ({ value: `q${n}`, label: `Q${n} (1601-EQ)` })),
+                    ...MONTH_LABELS.map((m, i) => ({ value: `m${i + 1}`, label: `${m} (0619-E)` })),
+                  ]}
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                />
+              </div>
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { messageOf } from '@/lib/errors'
-import { Badge, Card, DataTable, ExportMenu, Select, Toast, type Column } from '@/design-system'
+import { Badge, Button, Card, DataTable, Dialog, ExportMenu, Input, Select, Toast, type Column } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
 import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { localToday } from '@/lib/dates'
@@ -30,15 +30,31 @@ export function FilingCalendarPage() {
     }
   }, [rows, today])
 
-  function cycle(row: CalendarRow) {
-    const next = row.status === 'pending' ? 'prepared' : row.status === 'prepared' ? 'filed' : 'pending'
-    setStatus.mutate(
-      { row, status: next },
-      {
-        onSuccess: () => setToast(`${row.form} · ${row.period_end} marked ${next}`),
-        onError: (err) => setError(messageOf(err, 'Could not update the filing status.')),
-      },
-    )
+  // P2-18: the old row-click cycle ran filed → pending, which server-side
+  // DELETES the filing record (filed date + reference) with no confirmation.
+  // Now: pending → prepared advances directly; prepared opens a "mark filed"
+  // dialog that captures the reference; a filed row opens an explicit un-file
+  // confirmation instead of silently destroying the record.
+  const [filing, setFiling] = useState<CalendarRow | null>(null)
+  const [reference, setReference] = useState('')
+  const [unfiling, setUnfiling] = useState<CalendarRow | null>(null)
+
+  function advance(row: CalendarRow) {
+    setError(null)
+    if (row.status === 'pending') {
+      setStatus.mutate(
+        { row, status: 'prepared' },
+        {
+          onSuccess: () => setToast(`${row.form} · ${row.period_end} marked prepared`),
+          onError: (err) => setError(messageOf(err, 'Could not update the filing status.')),
+        },
+      )
+    } else if (row.status === 'prepared') {
+      setReference(row.reference ?? '')
+      setFiling(row)
+    } else {
+      setUnfiling(row)
+    }
   }
 
   const columns: Column<CalendarRow>[] = [
@@ -112,7 +128,8 @@ export function FilingCalendarPage() {
             />
           </div>
           <p style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>
-            Click a row to advance its status: pending → prepared → filed → pending.
+            Click a row to advance it: pending → prepared → filed. Un-filing a filed
+            return asks for confirmation.
           </p>
         </div>
         {error && <p style={{ font: 'var(--type-body-sm)', color: 'var(--clay-600)' }}>{error}</p>}
@@ -121,7 +138,7 @@ export function FilingCalendarPage() {
             rows={rows ?? []}
             columns={columns}
             rowKey={(r) => `${r.form}:${r.period_end}`}
-            onRowClick={cycle}
+            onRowClick={advance}
             emptyMessage={
               isPending
                 ? 'Computing…'
@@ -132,6 +149,85 @@ export function FilingCalendarPage() {
             dense
           />
         </Card>
+        <Dialog
+          open={!!filing}
+          onClose={() => setFiling(null)}
+          width={420}
+          title={filing ? `Mark ${filing.form} · ${filing.period_end} as filed?` : ''}
+          description="Record the confirmation number from eBIRForms/EFPS. Leaving it blank keeps any stored reference."
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setFiling(null)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={setStatus.isPending}
+                onClick={() => {
+                  if (!filing) return
+                  setStatus.mutate(
+                    { row: filing, status: 'filed', reference: reference.trim() },
+                    {
+                      onSuccess: () => {
+                        setToast(`${filing.form} · ${filing.period_end} marked filed`)
+                        setFiling(null)
+                      },
+                      onError: (err) => {
+                        setFiling(null)
+                        setError(messageOf(err, 'Could not mark the return filed.'))
+                      },
+                    },
+                  )
+                }}
+              >
+                Mark filed
+              </Button>
+            </>
+          }
+        >
+          <Input
+            label="Filing reference"
+            placeholder="e.g. EFPS confirmation no."
+            maxLength={60}
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+          />
+        </Dialog>
+        <Dialog
+          open={!!unfiling}
+          onClose={() => setUnfiling(null)}
+          width={420}
+          title={unfiling ? `Un-file ${unfiling.form} · ${unfiling.period_end}?` : ''}
+          description={`This erases the filed date${unfiling?.reference ? ` and reference “${unfiling.reference}”` : ''} and returns the deadline to pending. Only do this if it was marked filed by mistake.`}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setUnfiling(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={setStatus.isPending}
+                onClick={() => {
+                  if (!unfiling) return
+                  setStatus.mutate(
+                    { row: unfiling, status: 'pending', confirm: true },
+                    {
+                      onSuccess: () => {
+                        setToast(`${unfiling.form} · ${unfiling.period_end} back to pending`)
+                        setUnfiling(null)
+                      },
+                      onError: (err) => {
+                        setUnfiling(null)
+                        setError(messageOf(err, 'Could not un-file the return.'))
+                      },
+                    },
+                  )
+                }}
+              >
+                Un-file
+              </Button>
+            </>
+          }
+        />
         {toast && <Toast title={toast} onDismiss={() => setToast(null)} />}
       </PageBody>
     </>

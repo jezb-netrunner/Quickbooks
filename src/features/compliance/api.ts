@@ -96,6 +96,7 @@ export async function setFilingStatus(
   row: Pick<CalendarRow, 'form' | 'period_start' | 'period_end' | 'due_date'>,
   status: 'pending' | 'prepared' | 'filed',
   reference = '',
+  confirm = false,
 ): Promise<void> {
   const { error } = await supabase.rpc('set_filing_status', {
     p_client_id: clientId,
@@ -105,6 +106,9 @@ export async function setFilingStatus(
     p_due_date: row.due_date,
     p_status: status,
     p_reference: reference,
+    // Un-filing a filed return erases filed_at; the server refuses it unless
+    // this is set, and the UI only sets it from an explicit confirm dialog.
+    p_confirm: confirm,
   })
   if (error) throw error
 }

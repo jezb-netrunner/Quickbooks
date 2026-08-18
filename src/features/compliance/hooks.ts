@@ -81,7 +81,8 @@ export function useSetFilingStatus(clientId: string) {
       row: Pick<CalendarRow, 'form' | 'period_start' | 'period_end' | 'due_date'>
       status: 'pending' | 'prepared' | 'filed'
       reference?: string
-    }) => setFilingStatus(clientId, args.row, args.status, args.reference ?? ''),
+      confirm?: boolean
+    }) => setFilingStatus(clientId, args.row, args.status, args.reference ?? '', args.confirm ?? false),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['calendar', clientId] }),
   })
 }
@@ -103,4 +104,12 @@ export function quarterRange(year: number, q: 1 | 2 | 3 | 4): { from: string; to
   const startMonth = String((q - 1) * 3 + 1).padStart(2, '0')
   const endMonth = String(q * 3).padStart(2, '0')
   return { from: `${year}-${startMonth}-01`, to: `${year}-${endMonth}-${lastDay}` }
+}
+
+// P2-26: the 0619-E is a monthly remittance, so the register needs month
+// granularity too (the RPCs already take any range).
+export function monthRange(year: number, m: number): { from: string; to: string } {
+  const last = new Date(year, m, 0).getDate()
+  const mm = String(m).padStart(2, '0')
+  return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(last).padStart(2, '0')}` }
 }
