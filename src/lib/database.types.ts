@@ -478,6 +478,7 @@ export interface Database {
           regime: TaxRegime
           taxpayer_kind: TaxpayerKind
           income_tax_option: IncomeTaxOption
+          compliance_start: string | null
           updated_at: string
         }
         Insert: { client_id: string; regime: TaxRegime }
@@ -537,6 +538,7 @@ export interface Database {
           due_months_after: number | null
           due_day: number | null
           skip_q4: boolean
+          skip_quarter_months: boolean
           active: boolean
           created_at: string
         }
@@ -935,6 +937,8 @@ export interface Database {
           applied: string
           balance: string
           days_overdue: number
+          vat: string
+          net: string
         }[]
       }
       aging: {
@@ -1195,8 +1199,17 @@ export interface Database {
           p_due_date: string
           p_status: string
           p_reference?: string
+          p_confirm?: boolean
         }
         Returns: undefined
+      }
+      period_close_check: {
+        Args: { p_period_id: string }
+        Returns: {
+          draft_docs: number
+          submitted_docs: number
+          pending_bank: number
+        }[]
       }
       submit_entry: {
         Args: { p_entry_id: string }
@@ -1219,7 +1232,7 @@ export interface Database {
         Returns: { inserted: number; duplicates: number; skipped: number }[]
       }
       categorize_bank_txn: {
-        Args: { p_txn_id: string; p_account_id: string; p_memo?: string | null }
+        Args: { p_txn_id: string; p_account_id: string; p_memo?: string | null; p_tax_code_id?: string | null }
         Returns: undefined
       }
       exclude_bank_txn: {

@@ -4,6 +4,7 @@ import { Badge, Button, Card, DataTable, Dialog, Toast, type Column } from '@/de
 import { TopBar, PageBody } from '@/shell/AppShell'
 import { FormError } from '@/auth/AuthCard'
 import { useActiveClient } from '@/features/clients/routes/ClientLayout'
+import { periodCloseCheck, type PeriodCloseCheck } from '../api'
 import { usePeriodAction, usePeriods } from '../hooks'
 import type { Period } from '@/lib/database.types'
 
@@ -14,8 +15,24 @@ export function PeriodsPage() {
   const { data: periods } = usePeriods(client.id)
   const action = usePeriodAction(client.id)
   const [confirmLock, setConfirmLock] = useState<Period | null>(null)
+  // P2-17: closing shows what is still in flight inside the month first.
+  const [confirmClose, setConfirmClose] = useState<{ period: Period; check: PeriodCloseCheck } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  async function startClose(p: Period) {
+    setError(null)
+    try {
+      const check = await periodCloseCheck(p.id)
+      if (check.draft_docs + check.submitted_docs + check.pending_bank === 0) {
+        run(p.id, 'close', 'Period closed')
+      } else {
+        setConfirmClose({ period: p, check })
+      }
+    } catch (err) {
+      setError(messageOf(err, 'Could not check the period.'))
+    }
+  }
 
   function run(periodId: string, kind: 'close' | 'reopen' | 'lock', doneMsg: string) {
     setError(null)
@@ -66,7 +83,7 @@ export function PeriodsPage() {
         <span style={{ display: 'inline-flex', gap: 6 }}>
           {p.status === 'open' && (
             <Button size="sm" variant="secondary" disabled={action.isPending}
-              onClick={() => run(p.id, 'close', 'Period closed')}>
+              onClick={() => void startClose(p)}>
               Close
             </Button>
           )}
@@ -112,6 +129,45 @@ export function PeriodsPage() {
             reversing entry in the current month.
           </p>
         </Card>
+        <Dialog
+          open={!!confirmClose}
+          onClose={() => setConfirmClose(null)}
+          width={440}
+          title={confirmClose ? `Close ${MONTH_FORMAT.format(new Date(`${confirmClose.period.period_start}T00:00:00`))} with work in flight?` : ''}
+          description="These items are dated inside this month and are not posted yet. Closing does not touch them, but they cannot post until the period reopens."
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setConfirmClose(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={action.isPending}
+                onClick={() => {
+                  if (!confirmClose) return
+                  run(confirmClose.period.id, 'close', 'Period closed')
+                  setConfirmClose(null)
+                }}
+              >
+                Close anyway
+              </Button>
+            </>
+          }
+        >
+          {confirmClose && (
+            <ul style={{ margin: 0, paddingLeft: 18, font: 'var(--type-body-sm)', color: 'var(--text-secondary)', display: 'grid', gap: 4 }}>
+              {confirmClose.check.draft_docs > 0 && (
+                <li>{confirmClose.check.draft_docs} draft document{confirmClose.check.draft_docs === 1 ? '' : 's'}</li>
+              )}
+              {confirmClose.check.submitted_docs > 0 && (
+                <li>{confirmClose.check.submitted_docs} document{confirmClose.check.submitted_docs === 1 ? '' : 's'} awaiting approval</li>
+              )}
+              {confirmClose.check.pending_bank > 0 && (
+                <li>{confirmClose.check.pending_bank} uncategorized bank line{confirmClose.check.pending_bank === 1 ? '' : 's'}</li>
+              )}
+            </ul>
+          )}
+        </Dialog>
         <Dialog
           open={!!confirmLock}
           onClose={() => setConfirmLock(null)}

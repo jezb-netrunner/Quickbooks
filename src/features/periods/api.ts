@@ -25,3 +25,16 @@ export async function lockPeriod(periodId: string): Promise<void> {
   const { error } = await supabase.rpc('lock_period', { p_period_id: periodId })
   if (error) throw error
 }
+
+export interface PeriodCloseCheck {
+  draft_docs: number
+  submitted_docs: number
+  pending_bank: number
+}
+
+// P2-17: what is still in flight inside the month, surfaced before closing.
+export async function periodCloseCheck(periodId: string): Promise<PeriodCloseCheck> {
+  const { data, error } = await supabase.rpc('period_close_check', { p_period_id: periodId })
+  if (error) throw error
+  return data[0] ?? { draft_docs: 0, submitted_docs: 0, pending_bank: 0 }
+}

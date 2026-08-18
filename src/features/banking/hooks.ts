@@ -59,8 +59,8 @@ export function useImportBankTxns(clientId: string) {
 export function useCategorizeBankTxn(clientId: string) {
   const invalidate = useInvalidateBanking(clientId, true)
   return useMutation({
-    mutationFn: (input: { txnId: string; accountId: string }) =>
-      categorizeBankTxn(input.txnId, input.accountId),
+    mutationFn: (input: { txnId: string; accountId: string; taxCodeId?: string | null }) =>
+      categorizeBankTxn(input.txnId, input.accountId, input.taxCodeId ?? null),
     onSuccess: invalidate,
   })
 }

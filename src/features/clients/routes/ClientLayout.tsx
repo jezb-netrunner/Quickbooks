@@ -87,7 +87,10 @@ export function ClientLayout() {
   ]
 
   return (
-    <ClientContext.Provider value={client}>
+    // key={client.id}: switching clients remounts the whole subtree, so no
+    // half-typed dialog (or any other form state) can survive into another
+    // client's books (P2-01 — the wrong-client write path).
+    <ClientContext.Provider value={client} key={client.id}>
       <AppShell sidebar={<Sidebar items={nav} activeClientId={client.id} />}>
         <Outlet />
       </AppShell>

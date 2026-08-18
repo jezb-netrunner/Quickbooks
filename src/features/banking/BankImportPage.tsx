@@ -19,6 +19,7 @@ import { TopBar, PageBody } from '@/shell/AppShell'
 import { FormError } from '@/auth/AuthCard'
 import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { useAccounts } from '@/features/coa/hooks'
+import { useTaxCodes } from '@/features/tax/hooks'
 import { parseCsv } from '@/lib/csv'
 import type { Account, BankImportProfile, BankRule, BankTxn } from '@/lib/database.types'
 import type { ParsedBankRow, ProfileForm } from './api'
@@ -114,6 +115,19 @@ function QueueTab({
   const restore = useRestoreBankTxn(clientId)
   const applyRules = useApplyBankRules(clientId)
   const [chosen, setChosen] = useState<Record<string, string>>({})
+  // P2-22: optional input-VAT split per outflow line.
+  const [chosenTax, setChosenTax] = useState<Record<string, string>>({})
+  const { data: taxCodes } = useTaxCodes(clientId)
+  const vatOptions = useMemo(
+    () =>
+      (taxCodes ?? [])
+        .filter((t) => t.active && t.kind === 'input_vat')
+        .map((t) => ({
+          value: t.id,
+          label: `${t.code}${t.currentRate != null ? ` (${(t.currentRate * 100).toFixed(0)}%)` : ''}`,
+        })),
+    [taxCodes],
+  )
   const [showExcluded, setShowExcluded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -172,6 +186,25 @@ function QueueTab({
       ),
     },
     {
+      key: 'vat',
+      header: 'Input VAT',
+      width: 130,
+      render: (t) =>
+        Number(t.amount) < 0 && vatOptions.length > 0 ? (
+          <Select
+            aria-label={`Input VAT for ${t.description || t.txn_date}`}
+            fieldSize="sm"
+            placeholder="No VAT"
+            options={vatOptions}
+            value={chosenTax[t.id] ?? ''}
+            disabled={readOnly || busy}
+            onChange={(e) => setChosenTax((prev) => ({ ...prev, [t.id]: e.target.value }))}
+          />
+        ) : (
+          <span style={{ font: 'var(--type-label)', color: 'var(--text-muted)' }}>—</span>
+        ),
+    },
+    {
       key: 'actions',
       header: '',
       width: 150,
@@ -184,7 +217,7 @@ function QueueTab({
             onClick={() => {
               setError(null)
               categorize.mutate(
-                { txnId: t.id, accountId: chosen[t.id] },
+                { txnId: t.id, accountId: chosen[t.id], taxCodeId: chosenTax[t.id] || null },
                 {
                   onSuccess: () => onDone('Posted through the journal'),
                   onError: (err) => setError(messageOf(err, 'Could not categorize the line.')),
