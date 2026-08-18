@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Amount, Badge, Button, Card, DataTable, StatTile, Toast, type Column } from '@/design-system'
 import { TopBar, PageBody } from '@/shell/AppShell'
 import { useActiveClient } from '@/features/clients/routes/ClientLayout'
 import { useAccounts } from '@/features/coa/hooks'
 import { useContacts } from '@/features/contacts/hooks'
+import { useTaxProfile } from '@/features/tax/hooks'
 import type { DocType, DocumentRow } from '@/lib/database.types'
 import { DOC_TYPES, docLabel, openItemRef } from './docTypes'
 import { DocumentDialog } from './DocumentDialog'
@@ -16,6 +18,14 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
   const { data: documents } = useDocuments(client.id, docType)
   const { data: contacts } = useContacts(client.id)
   const { data: accounts } = useAccounts(client.id)
+  // Clients created before the setup wizard can exist without a tax profile.
+  // The database refuses to issue their documents (T-01), so surface that
+  // state up front instead of letting the save fail at the end. While the
+  // profile is still loading, keep New disabled (no flicker-open on slow
+  // networks); the banner itself waits for a resolved "no profile".
+  const { data: taxProfile, isPending: taxProfilePending } = useTaxProfile(client.id)
+  const needsTaxSetup = !taxProfilePending && taxProfile === null
+  const newBlocked = taxProfilePending || needsTaxSetup
   const today = localToday()
   const showsOpenItems = docType === 'invoice' || docType === 'bill' || docType === 'purchase'
   // Payment pages warm the open-items cache their dialog will need
@@ -85,7 +95,7 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
           <Button
             size="sm"
             iconLeft="plus"
-            disabled={!!client.archived_at}
+            disabled={!!client.archived_at || newBlocked}
             onClick={() => { setSelected(null); setDialogOpen(true) }}
           >
             New {config.noun}
@@ -93,6 +103,23 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
         }
       />
       <PageBody>
+        {needsTaxSetup && (
+          <Card
+            title="Tax setup required"
+            subtitle="This client has no tax profile, so VAT and withholding cannot apply and documents cannot be issued"
+            action={
+              <Link to={`/c/${client.id}/settings`}>
+                <Button size="sm" variant="accent">Set up tax &amp; compliance</Button>
+              </Link>
+            }
+          >
+            <p style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>
+              Run the one-time setup in client settings — it seeds the tax codes, provisional
+              rates, and this client’s filing calendar. Existing drafts stay put and can be
+              issued as soon as setup completes.
+            </p>
+          </Card>
+        )}
         {stats && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             <StatTile label="Outstanding" value={stats.open} icon="clock" footnote={`as of ${today}`} />

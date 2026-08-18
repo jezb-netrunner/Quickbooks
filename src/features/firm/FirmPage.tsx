@@ -16,8 +16,8 @@ import { AppShell, TopBar, PageBody } from '@/shell/AppShell'
 import { Sidebar } from '@/shell/Sidebar'
 import { Splash } from '@/shell/Splash'
 import { FormError } from '@/auth/AuthCard'
-import { useClients, useCreateClient, useMyMemberships } from '@/features/clients/hooks'
-import { ClientForm } from '@/features/clients/ClientForm'
+import { useClients, useMyMemberships } from '@/features/clients/hooks'
+import { ClientSetupWizard } from '@/features/clients/ClientSetupWizard'
 import { useAddMember, useAssignments, useMembers, useRemoveMember, useRenameFirm, useUpdateMember } from './hooks'
 import { MemberDialog, type MemberDialogValues } from './MemberDialog'
 import type { Client, MembershipRole } from '@/lib/database.types'
@@ -81,9 +81,7 @@ function FirmConsole({ firmId, firmName, isAdmin }: { firmId: string; firmName: 
 // ---------------------------------------------------------------- Clients
 
 function ClientsTab({ firmId, clients, onDone }: { firmId: string; clients: Client[]; onDone: (msg: string) => void }) {
-  const createClient = useCreateClient(firmId)
   const [adding, setAdding] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const columns: Column<Client>[] = [
     { key: 'name', header: 'Company', render: (c) => <Link to={`/c/${c.id}`}>{c.name}</Link> },
@@ -111,30 +109,16 @@ function ClientsTab({ firmId, clients, onDone }: { firmId: string; clients: Clie
       }
     >
       <DataTable rows={clients} columns={columns} rowKey={(c) => c.id} emptyMessage="No clients yet. Add the first one." />
-      <Dialog
-        open={adding}
-        onClose={() => setAdding(false)}
-        width={480}
-        title="Add a client company"
-        description="Reporting basis and fiscal year end drive period generation in the next phase."
-      >
-        <ClientForm
-          submitLabel="Add client"
-          busy={createClient.isPending}
-          error={error}
-          onCancel={() => setAdding(false)}
-          onSubmit={(values) => {
-            setError(null)
-            createClient.mutate(values, {
-              onSuccess: (c) => {
-                setAdding(false)
-                onDone(`${c.name} added`)
-              },
-              onError: (err) => setError(messageOf(err, 'Could not add the client.')),
-            })
+      {adding && (
+        <ClientSetupWizard
+          firmId={firmId}
+          onClose={() => setAdding(false)}
+          onDone={(c) => {
+            setAdding(false)
+            onDone(`${c.name} added and configured`)
           }}
         />
-      </Dialog>
+      )}
     </Card>
   )
 }

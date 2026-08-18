@@ -1,5 +1,12 @@
 import { supabase } from '@/lib/supabase'
-import type { Client, MembershipRole, ReportingBasis } from '@/lib/database.types'
+import type {
+  Client,
+  IncomeTaxOption,
+  MembershipRole,
+  ReportingBasis,
+  TaxRegime,
+  TaxpayerKind,
+} from '@/lib/database.types'
 
 export interface MembershipWithFirm {
   id: string
@@ -50,6 +57,25 @@ export async function createClient(firmId: string, form: ClientForm): Promise<Cl
     .single()
   if (error) throw error
   return data
+}
+
+export interface ClientTaxSetup {
+  regime: TaxRegime
+  taxpayer_kind: TaxpayerKind
+  income_tax_option: IncomeTaxOption
+}
+
+// One atomic call: seeds the chart of accounts, the regime's tax codes and
+// rates, the taxpayer shape, and the compliance calendar. Idempotent — safe
+// to re-run for a client that was created before the wizard existed.
+export async function setupClient(clientId: string, setup: ClientTaxSetup): Promise<void> {
+  const { error } = await supabase.rpc('setup_client', {
+    p_client_id: clientId,
+    p_regime: setup.regime,
+    p_taxpayer_kind: setup.taxpayer_kind,
+    p_income_tax_option: setup.income_tax_option,
+  })
+  if (error) throw error
 }
 
 export async function updateClient(clientId: string, form: Partial<ClientForm>): Promise<Client> {

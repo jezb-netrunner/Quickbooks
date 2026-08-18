@@ -8,8 +8,10 @@ import {
   fetchMyMemberships,
   setClientArchived,
   setRequireApproval,
+  setupClient,
   updateClient,
   type ClientForm,
+  type ClientTaxSetup,
 } from './api'
 
 export function useMyMemberships() {
@@ -44,6 +46,30 @@ export function useCreateClient(firmId: string) {
   return useMutation({
     mutationFn: (form: ClientForm) => createClient(firmId, form),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.clients }),
+  })
+}
+
+// The wizard's mutation: create the client, then run the one-call tax setup.
+// If setup fails after the create, the client exists but is unconfigured —
+// the documents pages show a "tax setup required" banner and the database
+// refuses to issue documents until setup completes, so nothing silent leaks.
+export function useCreateClientWithSetup(firmId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ form, setup }: { form: ClientForm; setup: ClientTaxSetup }) => {
+      const client = await createClient(firmId, form)
+      try {
+        await setupClient(client.id, setup)
+      } catch (err) {
+        throw new Error(
+          `${form.name} was created, but tax setup did not finish — open the client's settings and run “Set up tax & compliance”. (${err instanceof Error ? err.message : String(err)})`,
+          { cause: err },
+        )
+      }
+      return client
+    },
+    // Settled, not success: a half-created client must appear in the list too.
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.clients }),
   })
 }
 
