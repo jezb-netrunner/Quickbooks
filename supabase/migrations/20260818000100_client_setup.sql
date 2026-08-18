@@ -14,6 +14,10 @@
 --      client to have a tax profile. The UI blocks entry earlier with a banner;
 --      this is the enforcement. Existing unconfigured clients regain posting
 --      the moment tax setup runs (Client settings → Tax profile).
+--      Scope is DOCUMENTS deliberately: manual journal entries and bank
+--      categorization stay open for an unconfigured client (they carry no
+--      VAT/withholding, and P3-02's control-account guard already keeps them
+--      off the tax and subledger accounts) — 009_journal pins that behavior.
 
 -- ---------------------------------------------------------------- 1) RPC
 create or replace function public.setup_client(

@@ -29,10 +29,18 @@ export function ClientSetupWizard({
   const [option, setOption] = useState<IncomeTaxOption>('graduated')
   const [error, setError] = useState<string | null>(null)
 
+  // Escape / scrim-click must not dismiss the dialog while create+setup runs:
+  // the mutation would finish unobserved (TanStack drops mutate-level
+  // callbacks after unmount), the failure rescue message would never show,
+  // and a retry would create a second client row.
+  function guardedClose() {
+    if (!create.isPending) onClose()
+  }
+
   return (
     <Dialog
       open
-      onClose={onClose}
+      onClose={guardedClose}
       width={520}
       title={step === 1 ? 'Add a client company' : `Tax profile — ${draft?.name ?? ''}`}
       description={
@@ -47,7 +55,7 @@ export function ClientSetupWizard({
           submitLabel="Continue to tax profile"
           busy={false}
           error={null}
-          onCancel={onClose}
+          onCancel={guardedClose}
           onSubmit={(values) => {
             setDraft(values)
             setStep(2)

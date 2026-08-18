@@ -20,9 +20,12 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
   const { data: accounts } = useAccounts(client.id)
   // Clients created before the setup wizard can exist without a tax profile.
   // The database refuses to issue their documents (T-01), so surface that
-  // state up front instead of letting the save fail at the end.
+  // state up front instead of letting the save fail at the end. While the
+  // profile is still loading, keep New disabled (no flicker-open on slow
+  // networks); the banner itself waits for a resolved "no profile".
   const { data: taxProfile, isPending: taxProfilePending } = useTaxProfile(client.id)
   const needsTaxSetup = !taxProfilePending && taxProfile === null
+  const newBlocked = taxProfilePending || needsTaxSetup
   const today = localToday()
   const showsOpenItems = docType === 'invoice' || docType === 'bill' || docType === 'purchase'
   // Payment pages warm the open-items cache their dialog will need
@@ -92,7 +95,7 @@ export function DocumentsPage({ docType }: { docType: DocType }) {
           <Button
             size="sm"
             iconLeft="plus"
-            disabled={!!client.archived_at || needsTaxSetup}
+            disabled={!!client.archived_at || newBlocked}
             onClick={() => { setSelected(null); setDialogOpen(true) }}
           >
             New {config.noun}

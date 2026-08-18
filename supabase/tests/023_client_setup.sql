@@ -4,7 +4,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(23);
 
 \ir 000_fixture.sql.inc
 
@@ -49,12 +49,26 @@ select throws_like(
 );
 select tap.logout();
 
--- Authorization: firm B's admin cannot set up firm A's client.
+-- Authorization: setup_client rides app.can_write_client — probe each persona.
 select tap.login('22222222-2222-4222-8222-222222222205');
 select throws_like(
   $$ select public.setup_client(tap.v('a1'), 'vat', 'individual', 'graduated') $$,
   '%not authorized%',
   'T-01: an outsider cannot run setup on another firm''s client'
+);
+select tap.logout();
+select tap.login('22222222-2222-4222-8222-222222222204');
+select throws_like(
+  $$ select public.setup_client(tap.v('a1'), 'vat', 'individual', 'graduated') $$,
+  '%not authorized%',
+  'T-01: a client viewer cannot run setup'
+);
+select tap.logout();
+select tap.login('22222222-2222-4222-8222-222222222203');
+select throws_like(
+  $$ select public.setup_client(tap.v('a1'), 'vat', 'individual', 'graduated') $$,
+  '%not authorized%',
+  'T-01: unassigned staff cannot run setup'
 );
 select tap.logout();
 
@@ -139,6 +153,32 @@ select ok(
   and not exists (select 1 from public.compliance_rules
                   where client_id = tap.v('a2') and form in ('1701Q', '1701A') and active),
   'T-01: the corporate reshape activates 1702Q and deactivates the 1701 forms'
+);
+select tap.logout();
+
+-- Assigned staff may run setup (same authority as the seeds they replace).
+select tap.login('22222222-2222-4222-8222-222222222202');
+select lives_ok(
+  $$ select public.setup_client(tap.v('a1'), 'vat', 'individual', 'graduated') $$,
+  'T-01: staff assigned to the client can run setup'
+);
+-- The taxpayer-shape invariant holds even for direct column updates that
+-- bypass the RPC (PostgREST PATCH path): the table CHECK is the enforcement.
+select throws_like(
+  $$ update public.client_tax_profiles
+     set income_tax_option = 'rcit' where client_id = tap.v('a1') $$,
+  '%violates check constraint%',
+  'T-01: storing individual+rcit directly is rejected by the table CHECK'
+);
+select tap.logout();
+
+-- An archived client cannot be reconfigured.
+update public.clients set archived_at = now() where id = tap.v('a2');
+select tap.login('22222222-2222-4222-8222-222222222201');
+select throws_like(
+  $$ select public.setup_client(tap.v('a2'), 'non_vat', 'corporate', 'rcit') $$,
+  '%not authorized%',
+  'T-01: setup is refused for an archived client'
 );
 select tap.logout();
 
