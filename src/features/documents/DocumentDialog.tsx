@@ -153,6 +153,23 @@ function DocumentForm({
   )
   const [whtCodeId, setWhtCodeId] = useState(doc?.wht_tax_code_id ?? '')
   const [whtBase, setWhtBase] = useState(doc?.wht_base != null ? String(doc.wht_base) : '')
+  // Default a new line to the standard 12% VAT for VAT-registered clients, so a
+  // VAT invoice/bill applies output/input VAT without hunting for the per-line
+  // picker. Empty for non-VAT clients and doc types without line VAT (the find
+  // returns nothing), and existing saved lines keep whatever was stored.
+  const defaultLineTaxCodeId = config.lineTaxKind
+    ? (taxCodes.find(
+        (t) => t.active && t.kind === config.lineTaxKind && t.vat_class === 'taxable',
+      )?.id ?? '')
+    : ''
+  const blankLine = (): EditableLine => ({
+    item_id: '',
+    qty: '',
+    account_id: '',
+    description: '',
+    amount: '',
+    tax_code_id: defaultLineTaxCodeId,
+  })
   const [lines, setLines] = useState<EditableLine[]>(
     detail.lines.length > 0
       ? detail.lines.map((l) => ({
@@ -164,7 +181,7 @@ function DocumentForm({
           tax_code_id: l.tax_code_id ?? '',
         }))
       : config.hasLines
-        ? [{ item_id: '', qty: '', account_id: '', description: '', amount: '', tax_code_id: '' }]
+        ? [blankLine()]
         : [],
   )
   const [error, setError] = useState<string | null>(null)
@@ -176,9 +193,29 @@ function DocumentForm({
       ),
     [contacts, config.contactSide],
   )
+  // A summary/header account (one that owns child accounts) is never a posting
+  // target, so it must not appear in any account picker. parent_id is the
+  // intended signal but the COA seed populates it inconsistently, so also treat
+  // an account whose code owns `${code}-NN` children as a header.
+  const headerAccountIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const a of accounts) {
+      const ownsChildren = accounts.some(
+        (o) => o.id !== a.id && (o.parent_id === a.id || o.code.startsWith(`${a.code}-`)),
+      )
+      if (ownsChildren) ids.add(a.id)
+    }
+    return ids
+  }, [accounts])
+  // Cash side of receipts/disbursements: postable cash accounts only — never the
+  // "Cash and cash equivalents" header that the old code.startsWith('1000')
+  // sweep wrongly included (P: cash picker showed the parent rollup).
   const bankAccounts = useMemo(
-    () => accounts.filter((a) => !a.archived_at && a.code.startsWith('1000')),
-    [accounts],
+    () =>
+      accounts.filter(
+        (a) => !a.archived_at && a.code.startsWith('1000') && !headerAccountIds.has(a.id),
+      ),
+    [accounts, headerAccountIds],
   )
   const taxAccountCodes = useMemo(() => new Set(taxCodes.map((t) => t.account_code)), [taxCodes])
   // Only the account types that make sense for this document's lines, and
@@ -197,9 +234,10 @@ function DocumentForm({
             a.code !== '1100' &&
             a.code !== '2000' &&
             a.code !== '1200' &&
-            !taxAccountCodes.has(a.code)),
+            !taxAccountCodes.has(a.code) &&
+            !headerAccountIds.has(a.id)),
       ),
-    [accounts, config.hasItems, config.lineAccountTypes, referenced, taxAccountCodes],
+    [accounts, config.hasItems, config.lineAccountTypes, referenced, taxAccountCodes, headerAccountIds],
   )
   const lineTaxCodes = useMemo(
     () => taxCodes.filter((t) => t.active && t.kind === config.lineTaxKind),
@@ -675,7 +713,7 @@ function DocumentForm({
             ))}
             {!isIssued && (
               <div>
-                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, { item_id: '', qty: '', account_id: '', description: '', amount: '', tax_code_id: '' }])}>
+                <Button size="sm" variant="ghost" iconLeft="plus" onClick={() => setLines((p) => [...p, blankLine()])}>
                   Add line
                 </Button>
               </div>
