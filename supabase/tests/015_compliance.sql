@@ -143,7 +143,9 @@ select is(
   (select amount from public.wp_income_tax(tap.v('a1'), date '2026-01-01', date '2026-03-31') where line_no = 9),
   -20.00::numeric(18,2), 'graduated tax under the first bracket nets to a 20 overpayment from CWT credits'
 );
-update public.client_tax_profiles set income_tax_option = 'eight_percent' where client_id = tap.v('a1');
+-- 8% is only for non-VAT individuals, so the regime flips with the option.
+update public.client_tax_profiles
+   set regime = 'non_vat', income_tax_option = 'eight_percent' where client_id = tap.v('a1');
 select is(
   (select amount from public.wp_income_tax(tap.v('a1'), date '2026-01-01', date '2026-03-31') where line_no = 6),
   0.00::numeric(18,2), 'the 8% option owes nothing under the exemption'

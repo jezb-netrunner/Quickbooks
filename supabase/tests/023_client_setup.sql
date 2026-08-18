@@ -4,7 +4,7 @@
 begin;
 set search_path = public, extensions;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(25);
 
 \ir 000_fixture.sql.inc
 
@@ -46,6 +46,11 @@ select throws_like(
   $$ select public.setup_client(tap.v('a1'), 'sometimes-vat', 'individual', 'graduated') $$,
   '%regime%',
   'T-01: an unknown regime is rejected'
+);
+select throws_like(
+  $$ select public.setup_client(tap.v('a1'), 'vat', 'individual', 'eight_percent') $$,
+  '%only available to non-VAT%',
+  'TRAIN: a VAT-registered individual cannot elect the 8% option'
 );
 select tap.logout();
 
@@ -169,6 +174,13 @@ select throws_like(
      set income_tax_option = 'rcit' where client_id = tap.v('a1') $$,
   '%violates check constraint%',
   'T-01: storing individual+rcit directly is rejected by the table CHECK'
+);
+-- a1 is VAT-registered here: the 8% option must be unstorable even directly.
+select throws_like(
+  $$ update public.client_tax_profiles
+     set income_tax_option = 'eight_percent' where client_id = tap.v('a1') $$,
+  '%violates check constraint%',
+  'TRAIN: storing vat+eight_percent directly is rejected by the table CHECK'
 );
 select tap.logout();
 

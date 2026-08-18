@@ -58,7 +58,13 @@ export function TaxProfileCard({ clientId }: { clientId: string }) {
                 { value: 'non_vat', label: 'Non-VAT (percentage tax, no VAT codes)' },
               ]}
               value={effectiveRegime}
-              onChange={(e) => setRegime(e.target.value as TaxRegime)}
+              onChange={(e) => {
+                const next = e.target.value as TaxRegime
+                setRegime(next)
+                // 8% is only for non-VAT individuals (TRAIN): flipping to VAT
+                // with 8% in effect falls back to the graduated table.
+                if (next === 'vat' && effectiveOption === 'eight_percent') setOption('graduated')
+              }}
               disabled={busy}
             />
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
@@ -85,7 +91,10 @@ export function TaxProfileCard({ clientId }: { clientId: string }) {
                     ? [{ value: 'rcit', label: 'Regular corporate (RCIT)' }]
                     : [
                         { value: 'graduated', label: 'Graduated table' },
-                        { value: 'eight_percent', label: '8% of gross option' },
+                        // Only non-VAT individuals may elect the 8% (TRAIN).
+                        ...(effectiveRegime === 'non_vat'
+                          ? [{ value: 'eight_percent', label: '8% of gross option' }]
+                          : []),
                       ]
                 }
                 value={effectiveOption}
