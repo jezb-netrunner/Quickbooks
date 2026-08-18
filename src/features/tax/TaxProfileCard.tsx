@@ -1,57 +1,43 @@
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { messageOf } from '@/lib/errors'
 import { Button, Card, Select } from '@/design-system'
 import { FormError } from '@/auth/AuthCard'
-import { supabase } from '@/lib/supabase'
-import { keys } from '@/lib/queryKeys'
 import type { IncomeTaxOption, TaxRegime, TaxpayerKind } from '@/lib/database.types'
-import { seedCompliance } from '@/features/compliance/api'
-import { useSeedTaxCodes, useTaxProfile } from './hooks'
+import { useSetupClient, useTaxProfile } from './hooks'
 
-// One-time (idempotent) tax setup per client: regime + taxpayer shape, then
-// seed the starter codes, rates, brackets, and filing deadline rules. All
-// seeded values are provisional — the CPA verifies them; the engine and the
-// working papers only ever read the effective-dated configuration tables.
+// Idempotent tax setup per client — the same one-call setup_client RPC the
+// onboarding wizard runs: regime + taxpayer shape, starter codes, rates,
+// brackets, filing rules, and reconciliation of rules/VAT codes after a
+// regime or option change. All seeded values are provisional — the CPA
+// verifies them; the engine only ever reads the effective-dated tables.
 export function TaxProfileCard({ clientId }: { clientId: string }) {
-  const qc = useQueryClient()
   const { data: profile, isPending } = useTaxProfile(clientId)
-  const seed = useSeedTaxCodes(clientId)
+  const setup = useSetupClient(clientId)
   // null = untouched; stored values (or defaults) show until the user picks.
   const [regime, setRegime] = useState<TaxRegime | null>(null)
   const [kind, setKind] = useState<TaxpayerKind | null>(null)
   const [option, setOption] = useState<IncomeTaxOption | null>(null)
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const busy = setup.isPending
 
   const effectiveRegime: TaxRegime = regime ?? profile?.regime ?? 'vat'
   const effectiveKind: TaxpayerKind = kind ?? profile?.taxpayer_kind ?? 'individual'
   const effectiveOption: IncomeTaxOption =
     option ?? profile?.income_tax_option ?? (effectiveKind === 'corporate' ? 'rcit' : 'graduated')
 
-  async function runSetup() {
+  function runSetup() {
     setError(null)
-    setBusy(true)
-    try {
-      await new Promise<void>((resolve, reject) =>
-        seed.mutate(effectiveRegime, { onSuccess: () => resolve(), onError: reject }),
-      )
-      const { error: updateErr } = await supabase
-        .from('client_tax_profiles')
-        .update({ taxpayer_kind: effectiveKind, income_tax_option: effectiveOption })
-        .eq('client_id', clientId)
-      if (updateErr) throw updateErr
-      await seedCompliance(clientId)
-      void qc.invalidateQueries({ queryKey: keys.taxProfile(clientId) })
-      void qc.invalidateQueries({ queryKey: ['calendar', clientId] })
-      setRegime(null)
-      setKind(null)
-      setOption(null)
-    } catch (err) {
-      setError(messageOf(err, 'Could not run tax setup.'))
-    } finally {
-      setBusy(false)
-    }
+    setup.mutate(
+      { regime: effectiveRegime, taxpayer_kind: effectiveKind, income_tax_option: effectiveOption },
+      {
+        onSuccess: () => {
+          setRegime(null)
+          setKind(null)
+          setOption(null)
+        },
+        onError: (err) => setError(messageOf(err, 'Could not run tax setup.')),
+      },
+    )
   }
 
   return (
@@ -84,8 +70,11 @@ export function TaxProfileCard({ clientId }: { clientId: string }) {
                 ]}
                 value={effectiveKind}
                 onChange={(e) => {
-                  setKind(e.target.value as TaxpayerKind)
-                  setOption(null)
+                  const next = e.target.value as TaxpayerKind
+                  setKind(next)
+                  // Pin a valid option for the kind: a stored 8% profile must
+                  // not ride along into a corporate submission (RPC rejects it).
+                  setOption(next === 'corporate' ? 'rcit' : 'graduated')
                 }}
                 disabled={busy}
               />

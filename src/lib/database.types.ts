@@ -1009,6 +1009,15 @@ export interface Database {
         Args: { p_client_id: string; p_regime: string }
         Returns: undefined
       }
+      setup_client: {
+        Args: {
+          p_client_id: string
+          p_regime: string
+          p_taxpayer_kind: string
+          p_income_tax_option: string
+        }
+        Returns: undefined
+      }
       sales_book: {
         Args: { p_client_id: string; p_date_from: string; p_date_to: string }
         Returns: {

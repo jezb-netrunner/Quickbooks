@@ -11,6 +11,9 @@ select plan(20);
 select set_config('request.jwt.claims',
   json_build_object('sub', '22222222-2222-4222-8222-222222222201', 'role', 'authenticated')::text, true);
 select public.seed_client_coa(tap.v('a1'));
+-- The issue gate (T-01) requires a tax profile; this suite predates the wizard,
+-- so arrange the minimal profile directly (regime only, no tax codes).
+insert into public.client_tax_profiles (client_id, regime) values (tap.v('a1'), 'non_vat');
 select set_config('request.jwt.claims', '', true);
 insert into tap.ctx select 'acc_cash',  id from public.accounts where client_id = tap.v('a1') and code = '1000-02';
 insert into tap.ctx select 'acc_sales', id from public.accounts where client_id = tap.v('a1') and code = '4000';
